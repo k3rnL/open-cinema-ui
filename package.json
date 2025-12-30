@@ -1,0 +1,24 @@
+{
+  "name": "open-cinema-ui",
+  "version": "1.0.0",
+  "description": "Home cinema UI - Admin panel and on-screen interface",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev --workspace=apps/admin",
+    "dev:ui": "npm run dev --workspace=apps/ui",
+    "dev": "npm run dev:admin & npm run dev:ui",
+    "build:admin": "npm run build --workspace=apps/admin",
+    "build:ui": "npm run build --workspace=apps/ui",
+    "build": "npm run build:admin && npm run build:ui",
+    "type-check": "npm run type-check --workspaces",
+    "lint": "npm run lint --workspaces"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.2"
+  }
+}
