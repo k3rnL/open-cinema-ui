@@ -1,17 +1,15 @@
-import { apiClient } from './client'
-import type { Device } from '../types'
+import {apiClient} from './client'
+import type {Device} from '../types'
 
 export const devicesApi = {
-  getAll: () => apiClient.get<Device[]>('/api/devices'),
+    getAll: () => apiClient.get<Device[]>('/devices'),
 
-  getById: (id: string) => apiClient.get<Device>(`/api/devices/${id}`),
+    getById: (id: string) => apiClient.get<Device>(`/devices/${id}`),
 
-  create: (device: Omit<Device, 'id'>) =>
-    apiClient.post<Device>('/api/devices', device),
+    create: (device: Omit<Device, 'id' | 'status' | 'lastSeen'>) =>
+        apiClient.post<Device>('/devices', device),
 
-  update: (id: string, device: Partial<Device>) =>
-    apiClient.put<Device>(`/api/devices/${id}`, device),
+    delete: (id: string) => apiClient.delete<void>(`/devices/${id}`),
 
-  delete: (id: string) =>
-    apiClient.delete<void>(`/api/devices/${id}`),
+    update: () => apiClient.post<void>('/devices/update', {}),
 }

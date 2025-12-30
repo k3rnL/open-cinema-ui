@@ -28,17 +28,17 @@ export function useCreateDevice() {
   })
 }
 
-export function useUpdateDevice() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Device> }) =>
-      devicesApi.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['devices'] })
-    },
-  })
-}
+// export function useUpdateDevice() {
+//   const queryClient = useQueryClient()
+//
+//   return useMutation({
+//     mutationFn: ({ id, data }: { id: string; data: Partial<Device> }) =>
+//       devicesApi.update(id, data),
+//     onSuccess: () => {
+//       queryClient.invalidateQueries({ queryKey: ['devices'] })
+//     },
+//   })
+// }
 
 export function useDeleteDevice() {
   const queryClient = useQueryClient()

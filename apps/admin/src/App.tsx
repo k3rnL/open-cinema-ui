@@ -10,8 +10,10 @@ import { BrowserRouter, Route, Routes, Outlet } from 'react-router-dom'
 import { ConfigProvider, App as AntdApp } from 'antd'
 import { useNotificationProvider, ThemedLayoutV2, ErrorComponent } from '@refinedev/antd'
 import '@refinedev/antd/dist/reset.css'
+import DeviceList from "@/pages/devices/list.tsx";
+import DeviceCreate from "@/pages/devices/create.tsx";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 function App() {
   return (
@@ -28,11 +30,6 @@ function App() {
                   name: 'devices',
                   list: '/devices',
                   create: '/devices/create',
-                  edit: '/devices/edit/:id',
-                  show: '/devices/show/:id',
-                  meta: {
-                    canDelete: true,
-                  },
                 },
               ]}
               options={{
@@ -50,10 +47,8 @@ function App() {
                 >
                   <Route index element={<NavigateToResource resource="devices" />} />
                   <Route path="/devices">
-                    <Route index element={<div>Devices List</div>} />
-                    <Route path="create" element={<div>Create Device</div>} />
-                    <Route path="edit/:id" element={<div>Edit Device</div>} />
-                    <Route path="show/:id" element={<div>Show Device</div>} />
+                    <Route index element={<DeviceList />} />
+                    <Route path="create" element={<DeviceCreate />} />
                   </Route>
                   <Route path="*" element={<ErrorComponent />} />
                 </Route>

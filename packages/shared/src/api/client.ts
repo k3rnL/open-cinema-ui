@@ -3,7 +3,7 @@ export class ApiClient {
 
   constructor(baseUrl?: string) {
     // Default API URL - can be overridden by apps using import.meta.env
-    this.baseUrl = baseUrl || 'http://localhost:8000'
+    this.baseUrl = baseUrl || 'http://localhost:8000/api'
   }
 
   async get<T>(endpoint: string): Promise<T> {
