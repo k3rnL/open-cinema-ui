@@ -89,6 +89,7 @@ jobs:
         env:
           OUTPUT: "release_notes.md"
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release + upload assets
         uses: softprops/action-gh-release@v2
