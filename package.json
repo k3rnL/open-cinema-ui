@@ -15,7 +15,9 @@
     "build:ui": "npm run build --workspace=apps/ui",
     "build": "npm run build:admin && npm run build:ui",
     "type-check": "npm run type-check --workspaces",
-    "lint": "npm run lint --workspaces"
+    "lint": "npm run lint --workspaces",
+    "version": "npm version --workspaces --include-workspace-root",
+    "release": "npm run version && git push --follow-tags"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
