@@ -8,6 +8,7 @@ import routerProvider, {
 import dataProvider from '@refinedev/simple-rest'
 import {BrowserRouter, Route, Routes, Outlet} from 'react-router'
 import {ConfigProvider, App as AntdApp} from 'antd'
+import { PartitionOutlined, UsbOutlined, NodeExpandOutlined } from '@ant-design/icons'
 import {useNotificationProvider, ThemedLayout, ErrorComponent} from '@refinedev/antd'
 import '@refinedev/antd/dist/reset.css'
 import DeviceList from "@/pages/devices/list.tsx";
@@ -35,6 +36,9 @@ function App() {
                                     name: 'devices',
                                     list: '/devices',
                                     create: '/devices/create',
+                                    meta: {
+                                        icon: <UsbOutlined />
+                                    }
                                 },
                                 {
                                     name: 'camilladsp/pipelines',
@@ -42,6 +46,7 @@ function App() {
                                     create: '/camilladsp/pipelines/create',
                                     meta: {
                                         label: 'Pipelines',
+                                        icon: <PartitionOutlined />
                                     },
                                 },
                                 {
@@ -51,12 +56,14 @@ function App() {
                                     edit: '/camilladsp/mixers/edit/:id',
                                     meta: {
                                         label: 'Mixers',
+                                        icon: <NodeExpandOutlined />
                                     },
                                 },
                             ]}
                             options={{
                                 syncWithLocation: true,
                                 warnWhenUnsavedChanges: true,
+                                title: {text: 'open-cinema', icon: <img src="/logo.svg" alt="logo" style={{ width: 24 }} />}
                             }}
                         >
                             <Routes>
@@ -68,7 +75,7 @@ function App() {
                                     }
                                 >
                                     <Route index element={<NavigateToResource resource="devices"/>}/>
-                                    <Route path="/devices">
+                                    <Route path="/devices" >
                                         <Route index element={<DeviceList/>}/>
                                         <Route path="create" element={<DeviceCreate/>}/>
                                     </Route>
