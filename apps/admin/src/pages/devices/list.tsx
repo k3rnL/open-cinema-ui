@@ -8,11 +8,11 @@ export default function DeviceList() {
     const [refreshing, setUpdating] = useState(false)
 
     // useTable handles pagination, sorting, filtering automatically
-    const {tableProps, tableQueryResult} = useTable<Device>({
+    const {tableProps, tableQuery} = useTable<Device>({
         syncWithLocation: true,
     })
 
-    const {refetch, isFetching} = tableQueryResult
+    const {refetch, isFetching} = tableQuery
 
     const handleUpdate = async () => {
         setUpdating(true)

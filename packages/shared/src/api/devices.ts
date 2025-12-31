@@ -6,7 +6,7 @@ export const devicesApi = {
 
     getById: (id: string) => apiClient.get<Device>(`/devices/${id}`),
 
-    create: (device: Omit<Device, 'id' | 'status' | 'lastSeen'>) =>
+    create: (device: Omit<Device, 'id' | 'active' | 'lastSeen'>) =>
         apiClient.post<Device>('/devices', device),
 
     delete: (id: string) => apiClient.delete<void>(`/devices/${id}`),

@@ -1,14 +1,14 @@
 import {Refine} from '@refinedev/core'
 import {RefineKbar, RefineKbarProvider} from '@refinedev/kbar'
-import routerBindings, {
+import routerProvider, {
     NavigateToResource,
     UnsavedChangesNotifier,
     DocumentTitleHandler,
-} from '@refinedev/react-router-v6'
+} from '@refinedev/react-router'
 import dataProvider from '@refinedev/simple-rest'
-import {BrowserRouter, Route, Routes, Outlet} from 'react-router-dom'
+import {BrowserRouter, Route, Routes, Outlet} from 'react-router'
 import {ConfigProvider, App as AntdApp} from 'antd'
-import {useNotificationProvider, ThemedLayoutV2, ErrorComponent} from '@refinedev/antd'
+import {useNotificationProvider, ThemedLayout, ErrorComponent} from '@refinedev/antd'
 import '@refinedev/antd/dist/reset.css'
 import DeviceList from "@/pages/devices/list.tsx";
 import DeviceCreate from "@/pages/devices/create.tsx";
@@ -29,7 +29,7 @@ function App() {
                         <Refine
                             dataProvider={dataProvider(API_URL)}
                             notificationProvider={useNotificationProvider}
-                            routerProvider={routerBindings}
+                            routerProvider={routerProvider}
                             resources={[
                                 {
                                     name: 'devices',
@@ -62,9 +62,9 @@ function App() {
                             <Routes>
                                 <Route
                                     element={
-                                        <ThemedLayoutV2>
+                                        <ThemedLayout>
                                             <Outlet/>
-                                        </ThemedLayoutV2>
+                                        </ThemedLayout>
                                     }
                                 >
                                     <Route index element={<NavigateToResource resource="devices"/>}/>

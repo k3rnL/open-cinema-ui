@@ -1,11 +1,12 @@
 import {Create, useForm} from '@refinedev/antd'
 import {Form, Input, Select, InputNumber, Badge, Space} from 'antd'
-import {useState, useEffect} from 'react'
+import {HttpError, useList} from "@refinedev/core";
 
 interface Device {
     id: number
     name: string
     active: boolean
+    device_type: 'CAPTURE' | 'PLAYBACK'
 }
 
 interface Mixer {
@@ -20,27 +21,19 @@ export default function PipelineCreate() {
         redirect: 'list',
     })
 
-    const [devices, setDevices] = useState<Device[]>([])
-    const [mixers, setMixers] = useState<Mixer[]>([])
+    const { result: devicesResult } = useList<Device, HttpError>({
+        resource: "devices",
+    })
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
-                const [devicesRes, mixersRes] = await Promise.all([
-                    fetch(`${apiUrl}/devices`),
-                    fetch(`${apiUrl}/camilladsp/mixers`)
-                ])
-                const devicesData = await devicesRes.json()
-                const mixersData = await mixersRes.json()
-                setDevices(devicesData)
-                setMixers(mixersData)
-            } catch (error) {
-                console.error('Failed to fetch data:', error)
-            }
-        }
-        fetchData()
-    }, [])
+    const devices = devicesResult.data || []
+    const inputDevices = devices.filter((device) => device.device_type === 'CAPTURE')
+    const outputDevices = devices.filter((device) => device.device_type === 'PLAYBACK')
+
+    const { result: mixersResult} = useList<Mixer, HttpError>({
+        resource: "camilladsp/mixers",
+    })
+
+    const mixers = mixersResult.data || []
 
     return (
         <Create saveButtonProps={saveButtonProps}>
@@ -70,7 +63,7 @@ export default function PipelineCreate() {
                     rules={[{required: true, message: 'Please select input device'}]}
                 >
                     <Select placeholder="Select input device">
-                        {devices.map((device) => (
+                        {inputDevices.map((device) => (
                             <Select.Option key={device.id} value={device.id}>
                                 <Space>
                                     <Badge status={device.active ? 'success' : 'error'}/>
@@ -87,7 +80,7 @@ export default function PipelineCreate() {
                     rules={[{required: true, message: 'Please select output device'}]}
                 >
                     <Select placeholder="Select output device">
-                        {devices.map((device) => (
+                        {outputDevices.map((device) => (
                             <Select.Option key={device.id} value={device.id}>
                                 <Space>
                                     <Badge status={device.active ? 'success' : 'error'}/>

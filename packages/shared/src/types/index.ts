@@ -1,8 +1,8 @@
 export interface Device {
   id: string
   name: string
-  type: 'amplifier' | 'source' | 'display' | 'processor'
-  status: 'online' | 'offline'
+  device_type: 'CAPTURE' | 'PLAYBACK'
+  active: boolean
   lastSeen?: Date
 }
 

@@ -1,14 +1,16 @@
 import {List, useTable} from '@refinedev/antd'
 import {Table, Button, Badge, Space, Modal, Switch, message, Popconfirm, Select} from 'antd'
 import {EyeOutlined, FileTextOutlined, DeleteOutlined, EditOutlined} from '@ant-design/icons'
-import {useState, useEffect} from 'react'
+import {useState} from 'react'
 import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter'
 import {vscDarkPlus} from 'react-syntax-highlighter/dist/esm/styles/prism'
+import {HttpError, useList} from "@refinedev/core";
 
 interface Device {
     id: number
     name: string
     active: boolean
+    device_type: 'CAPTURE' | 'PLAYBACK'
 }
 
 interface Mixer {
@@ -39,36 +41,28 @@ export default function PipelineList() {
     const [currentConfigVisible, setCurrentConfigVisible] = useState(false)
     const [currentConfigContent, setCurrentConfigContent] = useState<string>('')
     const [activating, setActivating] = useState<number | null>(null)
-    const [devices, setDevices] = useState<Device[]>([])
-    const [mixers, setMixers] = useState<Mixer[]>([])
     const [updatingDevice, setUpdatingDevice] = useState<number | null>(null)
     const [updatingMixer, setUpdatingMixer] = useState<number | null>(null)
 
-    const {tableProps, tableQueryResult} = useTable<Pipeline>({
+    const {tableProps, tableQuery} = useTable<Pipeline>({
         syncWithLocation: true,
     })
 
-    const {isFetching, refetch} = tableQueryResult
+    const {isFetching, refetch} = tableQuery
 
-    // Fetch available devices and mixers
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
-                const [devicesRes, mixersRes] = await Promise.all([
-                    fetch(`${apiUrl}/devices`),
-                    fetch(`${apiUrl}/camilladsp/mixers`)
-                ])
-                const devicesData = await devicesRes.json()
-                const mixersData = await mixersRes.json()
-                setDevices(devicesData)
-                setMixers(mixersData)
-            } catch (error) {
-                console.error('Failed to fetch data:', error)
-            }
-        }
-        fetchData()
-    }, [])
+    const { result: devicesResult } = useList<Device, HttpError>({
+        resource: "devices",
+    })
+
+    const devices = devicesResult.data || []
+    const inputDevices = devices.filter((device) => device.device_type === 'CAPTURE')
+    const outputDevices = devices.filter((device) => device.device_type === 'PLAYBACK')
+
+    const { result: mixersResult} = useList<Mixer, HttpError>({
+        resource: "camilladsp/mixers",
+    })
+
+    const mixers = mixersResult.data || []
 
     const handleViewYaml = async (id: number) => {
         try {
@@ -224,7 +218,7 @@ export default function PipelineList() {
                                     disabled={updatingDevice === record.id}
                                     style={{width: 200}}
                                 >
-                                    {devices.map((device) => (
+                                    {inputDevices.map((device) => (
                                         <Select.Option key={device.id} value={device.id}>
                                             <Space>
                                                 <Badge status={device.active ? 'success' : 'error'}/>
@@ -248,7 +242,7 @@ export default function PipelineList() {
                                     disabled={updatingDevice === record.id}
                                     style={{width: 200}}
                                 >
-                                    {devices.map((device) => (
+                                    {outputDevices.map((device) => (
                                         <Select.Option key={device.id} value={device.id}>
                                             <Space>
                                                 <Badge status={device.active ? 'success' : 'error'}/>

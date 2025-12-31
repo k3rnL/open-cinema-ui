@@ -2,7 +2,7 @@ import {List, useTable} from '@refinedev/antd'
 import {Table, Button, Tag, Space, Popconfirm, message} from 'antd'
 import {EyeOutlined, DeleteOutlined, EditOutlined} from '@ant-design/icons'
 import {useState} from 'react'
-import {useNavigate} from 'react-router-dom'
+import {useNavigate} from 'react-router'
 
 interface MixerSource {
     channel: number
