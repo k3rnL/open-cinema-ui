@@ -18,6 +18,7 @@ import PipelineCreate from "@/pages/pipelines/create.tsx";
 import MixerList from "@/pages/mixers/list.tsx";
 import MixerCreate from "@/pages/mixers/create.tsx";
 import MixerEdit from "@/pages/mixers/edit.tsx";
+import {Dashboard} from "@/pages/dashboard";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
@@ -32,6 +33,10 @@ function App() {
                             notificationProvider={useNotificationProvider}
                             routerProvider={routerProvider}
                             resources={[
+                                {
+                                    name: 'dashboard',
+                                    list: '/dashboard'
+                                },
                                 {
                                     name: 'devices',
                                     list: '/devices',
@@ -75,6 +80,7 @@ function App() {
                                     }
                                 >
                                     <Route index element={<NavigateToResource resource="devices"/>}/>
+                                    <Route path="/dashboard" element={<Dashboard />} />
                                     <Route path="/devices" >
                                         <Route index element={<DeviceList/>}/>
                                         <Route path="create" element={<DeviceCreate/>}/>
