@@ -11,12 +11,22 @@ interface Device {
     active: boolean
 }
 
+interface Mixer {
+    id: number
+    name: string
+    input_channels: number
+    output_channels: number
+}
+
 interface Pipeline {
     id: number
     name: string
     description: string
     input_device: Device
     output_device: Device
+    samplerate: number
+    chunksize: number
+    mixer: Mixer | null
     enabled: boolean
     active: boolean
     created_at: string
@@ -30,7 +40,9 @@ export default function PipelineList() {
     const [currentConfigContent, setCurrentConfigContent] = useState<string>('')
     const [activating, setActivating] = useState<number | null>(null)
     const [devices, setDevices] = useState<Device[]>([])
+    const [mixers, setMixers] = useState<Mixer[]>([])
     const [updatingDevice, setUpdatingDevice] = useState<number | null>(null)
+    const [updatingMixer, setUpdatingMixer] = useState<number | null>(null)
 
     const {tableProps, tableQueryResult} = useTable<Pipeline>({
         syncWithLocation: true,
@@ -38,19 +50,24 @@ export default function PipelineList() {
 
     const {isFetching, refetch} = tableQueryResult
 
-    // Fetch available devices
+    // Fetch available devices and mixers
     useEffect(() => {
-        const fetchDevices = async () => {
+        const fetchData = async () => {
             try {
                 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
-                const response = await fetch(`${apiUrl}/devices`)
-                const data = await response.json()
-                setDevices(data)
+                const [devicesRes, mixersRes] = await Promise.all([
+                    fetch(`${apiUrl}/devices`),
+                    fetch(`${apiUrl}/camilladsp/mixers`)
+                ])
+                const devicesData = await devicesRes.json()
+                const mixersData = await mixersRes.json()
+                setDevices(devicesData)
+                setMixers(mixersData)
             } catch (error) {
-                console.error('Failed to fetch devices:', error)
+                console.error('Failed to fetch data:', error)
             }
         }
-        fetchDevices()
+        fetchData()
     }, [])
 
     const handleViewYaml = async (id: number) => {
@@ -148,6 +165,34 @@ export default function PipelineList() {
         }
     }
 
+    const handleMixerChange = async (pipelineId: number, mixerId: number | null) => {
+        setUpdatingMixer(pipelineId)
+        try {
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+            const response = await fetch(`${apiUrl}/camilladsp/pipelines/${pipelineId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    mixer_id: mixerId,
+                }),
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to update pipeline')
+            }
+
+            message.success('Mixer updated successfully')
+            await refetch()
+        } catch (error) {
+            message.error('Failed to update mixer')
+            console.error('Failed to update mixer:', error)
+        } finally {
+            setUpdatingMixer(null)
+        }
+    }
+
     return (
         <>
             <List
@@ -214,6 +259,38 @@ export default function PipelineList() {
                                 </Select>
                             </Space>
                         )}
+                    />
+
+                    <Table.Column
+                        title="Mixer"
+                        render={(_, record: Pipeline) => (
+                            <Select
+                                value={record.mixer?.id}
+                                onChange={(mixerId) => handleMixerChange(record.id, mixerId)}
+                                loading={updatingMixer === record.id}
+                                disabled={updatingMixer === record.id}
+                                style={{width: 200}}
+                                allowClear
+                                placeholder="No mixer"
+                            >
+                                {mixers.map((mixer) => (
+                                    <Select.Option key={mixer.id} value={mixer.id}>
+                                        {mixer.name} ({mixer.input_channels}→{mixer.output_channels})
+                                    </Select.Option>
+                                ))}
+                            </Select>
+                        )}
+                    />
+
+                    <Table.Column
+                        dataIndex="samplerate"
+                        title="Sample Rate"
+                        render={(rate: number) => `${rate} Hz`}
+                    />
+
+                    <Table.Column
+                        dataIndex="chunksize"
+                        title="Chunk Size"
                     />
 
                     <Table.Column

@@ -14,6 +14,9 @@ import DeviceList from "@/pages/devices/list.tsx";
 import DeviceCreate from "@/pages/devices/create.tsx";
 import PipelineList from "@/pages/pipelines/list.tsx";
 import PipelineCreate from "@/pages/pipelines/create.tsx";
+import MixerList from "@/pages/mixers/list.tsx";
+import MixerCreate from "@/pages/mixers/create.tsx";
+import MixerEdit from "@/pages/mixers/edit.tsx";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
@@ -41,6 +44,15 @@ function App() {
                                         label: 'Pipelines',
                                     },
                                 },
+                                {
+                                    name: 'camilladsp/mixers',
+                                    list: '/camilladsp/mixers',
+                                    create: '/camilladsp/mixers/create',
+                                    edit: '/camilladsp/mixers/edit/:id',
+                                    meta: {
+                                        label: 'Mixers',
+                                    },
+                                },
                             ]}
                             options={{
                                 syncWithLocation: true,
@@ -63,6 +75,11 @@ function App() {
                                     <Route path="/camilladsp/pipelines">
                                         <Route index element={<PipelineList/>}/>
                                         <Route path="create" element={<PipelineCreate/>}/>
+                                    </Route>
+                                    <Route path="/camilladsp/mixers">
+                                        <Route index element={<MixerList/>}/>
+                                        <Route path="create" element={<MixerCreate/>}/>
+                                        <Route path="edit/:id" element={<MixerEdit/>}/>
                                     </Route>
                                     <Route path="*" element={<ErrorComponent/>}/>
                                 </Route>

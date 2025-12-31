@@ -8,25 +8,38 @@ interface Device {
     active: boolean
 }
 
+interface Mixer {
+    id: number
+    name: string
+    input_channels: number
+    output_channels: number
+}
+
 export default function PipelineCreate() {
     const {formProps, saveButtonProps} = useForm({
         redirect: 'list',
     })
 
     const [devices, setDevices] = useState<Device[]>([])
+    const [mixers, setMixers] = useState<Mixer[]>([])
 
     useEffect(() => {
-        const fetchDevices = async () => {
+        const fetchData = async () => {
             try {
                 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
-                const response = await fetch(`${apiUrl}/devices`)
-                const data = await response.json()
-                setDevices(data)
+                const [devicesRes, mixersRes] = await Promise.all([
+                    fetch(`${apiUrl}/devices`),
+                    fetch(`${apiUrl}/camilladsp/mixers`)
+                ])
+                const devicesData = await devicesRes.json()
+                const mixersData = await mixersRes.json()
+                setDevices(devicesData)
+                setMixers(mixersData)
             } catch (error) {
-                console.error('Failed to fetch devices:', error)
+                console.error('Failed to fetch data:', error)
             }
         }
-        fetchDevices()
+        fetchData()
     }, [])
 
     return (
@@ -86,6 +99,19 @@ export default function PipelineCreate() {
                 </Form.Item>
 
                 <Form.Item
+                    label="Mixer (Optional)"
+                    name="mixer_id"
+                >
+                    <Select placeholder="No mixer" allowClear>
+                        {mixers.map((mixer) => (
+                            <Select.Option key={mixer.id} value={mixer.id}>
+                                {mixer.name} ({mixer.input_channels}→{mixer.output_channels} ch)
+                            </Select.Option>
+                        ))}
+                    </Select>
+                </Form.Item>
+
+                <Form.Item
                     label="Sample Rate (Hz)"
                     name="samplerate"
                     rules={[{required: true, message: 'Please enter sample rate'}]}
@@ -97,6 +123,15 @@ export default function PipelineCreate() {
                         <Select.Option value={96000}>96000 Hz (High-Res)</Select.Option>
                         <Select.Option value={192000}>192000 Hz (Ultra High-Res)</Select.Option>
                     </Select>
+                </Form.Item>
+
+                <Form.Item
+                    label="Chunk Size"
+                    name="chunksize"
+                    rules={[{required: true, message: 'Please enter chunk size'}]}
+                    initialValue={1024}
+                >
+                    <InputNumber min={64} max={8192} step={64} style={{width: '100%'}}/>
                 </Form.Item>
             </Form>
         </Create>
