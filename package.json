@@ -1,6 +1,6 @@
 {
   "name": "open-cinema-ui",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Home cinema UI - Admin panel and on-screen interface",
   "private": true,
   "workspaces": [
