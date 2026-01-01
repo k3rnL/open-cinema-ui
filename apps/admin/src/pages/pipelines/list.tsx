@@ -66,7 +66,7 @@ export default function PipelineList() {
 
     const handleViewYaml = async (id: number) => {
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost/api'
+            const apiUrl = import.meta.env.VITE_API_URL || '/api'
             const response = await fetch(`${apiUrl}/camilladsp/pipelines/${id}/yaml`)
             const data = await response.json()
             setYamlContent(data.yaml)
@@ -78,7 +78,7 @@ export default function PipelineList() {
 
     const handleViewCurrentConfig = async () => {
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost/api'
+            const apiUrl = import.meta.env.VITE_API_URL || '/api'
             const response = await fetch(`${apiUrl}/camilladsp/config/yaml`)
             const data = await response.json()
             setCurrentConfigContent(data.yaml)
@@ -91,7 +91,7 @@ export default function PipelineList() {
     const handleActivateToggle = async (id: number, currentActive: boolean) => {
         setActivating(id)
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost/api'
+            const apiUrl = import.meta.env.VITE_API_URL || '/api'
             const endpoint = currentActive ? 'deactivate' : 'activate'
             const response = await fetch(`${apiUrl}/camilladsp/pipelines/${id}/${endpoint}`, {
                 method: 'POST',
@@ -114,7 +114,7 @@ export default function PipelineList() {
 
     const handleDelete = async (id: number) => {
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost/api'
+            const apiUrl = import.meta.env.VITE_API_URL || '/api'
             const response = await fetch(`${apiUrl}/camilladsp/pipelines/${id}`, {
                 method: 'DELETE',
             })
@@ -134,7 +134,7 @@ export default function PipelineList() {
     const handleDeviceChange = async (pipelineId: number, deviceType: 'input' | 'output', deviceId: number) => {
         setUpdatingDevice(pipelineId)
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost/api'
+            const apiUrl = import.meta.env.VITE_API_URL || '/api'
             const response = await fetch(`${apiUrl}/camilladsp/pipelines/${pipelineId}`, {
                 method: 'PUT',
                 headers: {
@@ -162,7 +162,7 @@ export default function PipelineList() {
     const handleMixerChange = async (pipelineId: number, mixerId: number | null) => {
         setUpdatingMixer(pipelineId)
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost/api'
+            const apiUrl = import.meta.env.VITE_API_URL || '/api'
             const response = await fetch(`${apiUrl}/camilladsp/pipelines/${pipelineId}`, {
                 method: 'PUT',
                 headers: {

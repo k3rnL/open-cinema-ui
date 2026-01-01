@@ -38,7 +38,7 @@ export default function MixerList() {
 
     const handleDelete = async (id: number) => {
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost/api'
+            const apiUrl = import.meta.env.VITE_API_URL || '/api'
             const response = await fetch(`${apiUrl}/camilladsp/mixers/${id}/delete`, {
                 method: 'POST',
             })

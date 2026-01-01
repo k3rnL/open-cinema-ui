@@ -20,11 +20,11 @@ import MixerCreate from "@/pages/mixers/create.tsx";
 import MixerEdit from "@/pages/mixers/edit.tsx";
 import {Dashboard} from "@/pages/dashboard";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/api'
+const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 function App() {
     return (
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
             <RefineKbarProvider>
                 <ConfigProvider>
                     <AntdApp>
