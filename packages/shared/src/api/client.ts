@@ -2,8 +2,16 @@ export class ApiClient {
   private readonly baseUrl: string
 
   constructor(baseUrl?: string) {
-    // Default API URL - can be overridden by apps using import.meta.env
-    this.baseUrl = baseUrl || 'http://localhost/api'
+    // Use the same host as the app, or allow override
+    if (baseUrl) {
+      this.baseUrl = baseUrl
+    } else if (typeof window !== 'undefined') {
+      // Use current origin + /api path
+      this.baseUrl = `${window.location.origin}/api`
+    } else {
+      // Fallback for SSR or non-browser environments
+      this.baseUrl = 'http://localhost/api'
+    }
   }
 
   async get<T>(endpoint: string): Promise<T> {
