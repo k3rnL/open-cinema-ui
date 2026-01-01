@@ -7,7 +7,7 @@ export default defineConfig({
         port: 3000,
         host: true, // Expose to network for admin panel
     },
-    base: '/admin/',
+    base: process.env.VITE_BASE_PATH || '/admin/',
     resolve: {
         alias: {
             '@': '/src',

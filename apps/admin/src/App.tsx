@@ -20,7 +20,7 @@ import MixerCreate from "@/pages/mixers/create.tsx";
 import MixerEdit from "@/pages/mixers/edit.tsx";
 import {Dashboard} from "@/pages/dashboard";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/api'
 
 function App() {
     return (
@@ -68,7 +68,7 @@ function App() {
                             options={{
                                 syncWithLocation: true,
                                 warnWhenUnsavedChanges: true,
-                                title: {text: 'open-cinema', icon: <img src="/logo.svg" alt="logo" style={{ width: 24 }} />}
+                                title: {text: 'open-cinema', icon: <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="logo" style={{ width: 24 }} />}
                             }}
                         >
                             <Routes>

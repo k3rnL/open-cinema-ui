@@ -7,7 +7,7 @@ export default defineConfig({
         port: 3001,
         host: true,
     },
-    base: '/ui/',
+    base: process.env.VITE_BASE_PATH || '/ui/',
     resolve: {
         alias: {
             '@': '/src',
