@@ -8,7 +8,7 @@ import routerProvider, {
 import dataProvider from '@refinedev/simple-rest'
 import {BrowserRouter, Route, Routes, Outlet} from 'react-router'
 import {ConfigProvider, App as AntdApp} from 'antd'
-import {PartitionOutlined, UsbOutlined, NodeExpandOutlined} from '@ant-design/icons'
+import {PartitionOutlined, UsbOutlined, NodeExpandOutlined, ControlOutlined, OneToOneOutlined, SoundOutlined} from '@ant-design/icons'
 import {useNotificationProvider, ThemedLayout, ErrorComponent} from '@refinedev/antd'
 import '@refinedev/antd/dist/reset.css'
 import DeviceList from "@/pages/devices/list.tsx";
@@ -49,12 +49,20 @@ function App() {
                                         }
                                     },
                                     {
+                                        name: 'camilladsp',
+                                        meta: {
+                                            label: 'CamillaDSP',
+                                            icon: <OneToOneOutlined/>
+                                        }
+                                    },
+                                    {
                                         name: 'camilladsp/pipelines',
                                         list: '/camilladsp/pipelines',
                                         create: '/camilladsp/pipelines/create',
                                         meta: {
                                             label: 'Pipelines',
-                                            icon: <PartitionOutlined/>
+                                            icon: <PartitionOutlined/>,
+                                            parent: 'camilladsp'
                                         },
                                     },
                                     {
@@ -64,8 +72,16 @@ function App() {
                                         edit: '/camilladsp/mixers/edit/:id',
                                         meta: {
                                             label: 'Mixers',
-                                            icon: <NodeExpandOutlined/>
+                                            icon: <NodeExpandOutlined/>,
+                                            parent: 'camilladsp'
                                         },
+                                    },
+                                    {
+                                        name: 'preferences',
+                                        meta: {
+                                            label: 'Preferences',
+                                            icon: <ControlOutlined/>
+                                        }
                                     },
                                     {
                                         name: 'preferences/audio-backends',
@@ -73,7 +89,8 @@ function App() {
                                         edit: '/preferences/audio-backends/:name',
                                         meta: {
                                             label: 'Audio Backends',
-                                            parent: 'Preferences'
+                                            icon: <SoundOutlined/>,
+                                            parent: 'preferences'
                                         }
                                     }
                                 ]}
