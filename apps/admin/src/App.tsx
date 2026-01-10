@@ -20,6 +20,7 @@ import MixerCreate from "@/pages/mixers/create.tsx";
 import MixerEdit from "@/pages/mixers/edit.tsx";
 import {Dashboard} from "@/pages/dashboard";
 import {ColorModeContextProvider} from "./contexts/color-mode";
+import AudioBackendPreferenceList from "@/pages/preferences/list.tsx";
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
@@ -66,6 +67,15 @@ function App() {
                                             icon: <NodeExpandOutlined/>
                                         },
                                     },
+                                    {
+                                        name: 'preferences/audio-backends',
+                                        list: '/preferences/audio-backends',
+                                        edit: '/preferences/audio-backends/:name',
+                                        meta: {
+                                            label: 'Audio Backends',
+                                            parent: 'Preferences'
+                                        }
+                                    }
                                 ]}
                                 options={{
                                     syncWithLocation: true,
@@ -99,6 +109,9 @@ function App() {
                                             <Route index element={<MixerList/>}/>
                                             <Route path="create" element={<MixerCreate/>}/>
                                             <Route path="edit/:id" element={<MixerEdit/>}/>
+                                        </Route>
+                                        <Route path="/preferences/audio-backends">
+                                            <Route index element={<AudioBackendPreferenceList/>}/>
                                         </Route>
                                         <Route path="*" element={<ErrorComponent/>}/>
                                     </Route>
