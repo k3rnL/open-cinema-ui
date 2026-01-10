@@ -1,8 +1,9 @@
 import {List, useTable} from '@refinedev/antd'
 import {Table, Button, message} from 'antd'
-import {ReloadOutlined} from '@ant-design/icons'
+import {ReloadOutlined, CloseOutlined} from '@ant-design/icons'
 import {type Device, devicesApi} from '@open-cinema/shared'
 import {useState} from 'react'
+import {useDeleteMany} from '@refinedev/core'
 
 export default function DeviceList() {
     const [refreshing, setUpdating] = useState(false)
@@ -13,6 +14,7 @@ export default function DeviceList() {
     })
 
     const {refetch, isFetching} = tableQuery
+    const {mutate: deleteMany} = useDeleteMany<Device>()
 
     const handleUpdate = async () => {
         setUpdating(true)
@@ -30,6 +32,43 @@ export default function DeviceList() {
         }
     }
 
+    const handleForgetInactives = () => {
+        // Get inactive devices from current table data
+        const inactiveDevices = (tableProps.dataSource || []).filter(
+            (device: Device) => !device.active
+        )
+
+        if (inactiveDevices.length === 0) {
+            message.info('No inactive devices to delete')
+            return
+        }
+
+        // Delete all inactive devices using Refine's useDeleteMany
+        deleteMany({
+            resource: 'devices',
+            ids: inactiveDevices.map((device: Device) => device.id),
+            successNotification: () => ({
+                message: `Deleted ${inactiveDevices.length} inactive device(s)`,
+                type: 'success',
+            }),
+            errorNotification: (error: any) => {
+                const errorData = error?.response?.data || error?.data
+                if (errorData?.error && errorData?.references) {
+                    const refList = errorData.references.map((ref: string) => `• ${ref}`).join('\n')
+                    return {
+                        message: refList,
+                        description: errorData.error,
+                        type: 'error',
+                    }
+                }
+                return {
+                    message: 'Failed to delete inactive devices',
+                    type: 'error',
+                }
+            },
+        })
+    }
+
     return (
         <List
             headerButtons={({defaultButtons}) => (
@@ -42,6 +81,15 @@ export default function DeviceList() {
                         loading={refreshing || isFetching}
                     >
                         Refresh Devices
+                    </Button>
+                    <Button
+                        type="primary"
+                        danger={true}
+                        icon={<CloseOutlined/>}
+                        onClick={handleForgetInactives}
+                        loading={refreshing || isFetching}
+                    >
+                        Forget inactives
                     </Button>
                 </>
             )}
