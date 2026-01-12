@@ -1,0 +1,33 @@
+/* Dark theme styles for ReactFlow Controls */
+.react-flow__controls {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.react-flow__controls-button {
+    background-color: #1f1f1f !important;
+    border-bottom: 1px solid #434343 !important;
+    color: #fff !important;
+}
+
+.react-flow__controls-button:hover {
+    background-color: #2a2a2a !important;
+}
+
+.react-flow__controls-button svg {
+    fill: #fff !important;
+}
+
+/* Light theme styles */
+body:not(.dark-mode) .react-flow__controls-button {
+    background-color: #fff !important;
+    border-bottom: 1px solid #d9d9d9 !important;
+    color: rgba(0, 0, 0, 0.85) !important;
+}
+
+body:not(.dark-mode) .react-flow__controls-button:hover {
+    background-color: #f5f5f5 !important;
+}
+
+body:not(.dark-mode) .react-flow__controls-button svg {
+    fill: rgba(0, 0, 0, 0.85) !important;
+}

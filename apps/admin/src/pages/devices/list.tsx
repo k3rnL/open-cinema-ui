@@ -1,7 +1,7 @@
 import {List, useTable} from '@refinedev/antd'
 import {Table, Button, message} from 'antd'
 import {ReloadOutlined, CloseOutlined} from '@ant-design/icons'
-import {type Device, devicesApi} from '@open-cinema/shared'
+import {type AudioDevice, devicesApi} from '@open-cinema/shared'
 import {useState} from 'react'
 import {useDeleteMany} from '@refinedev/core'
 
@@ -9,12 +9,12 @@ export default function DeviceList() {
     const [refreshing, setUpdating] = useState(false)
 
     // useTable handles pagination, sorting, filtering automatically
-    const {tableProps, tableQuery} = useTable<Device>({
+    const {tableProps, tableQuery} = useTable<AudioDevice>({
         syncWithLocation: true,
     })
 
     const {refetch, isFetching} = tableQuery
-    const {mutate: deleteMany} = useDeleteMany<Device>()
+    const {mutate: deleteMany} = useDeleteMany<AudioDevice>()
 
     const handleUpdate = async () => {
         setUpdating(true)
@@ -35,7 +35,7 @@ export default function DeviceList() {
     const handleForgetInactives = () => {
         // Get inactive devices from current table data
         const inactiveDevices = (tableProps.dataSource || []).filter(
-            (device: Device) => !device.active
+            (device: AudioDevice) => !device.active
         )
 
         if (inactiveDevices.length === 0) {
@@ -46,7 +46,7 @@ export default function DeviceList() {
         // Delete all inactive devices using Refine's useDeleteMany
         deleteMany({
             resource: 'devices',
-            ids: inactiveDevices.map((device: Device) => device.id),
+            ids: inactiveDevices.map((device: AudioDevice) => device.id),
             successNotification: () => ({
                 message: `Deleted ${inactiveDevices.length} inactive device(s)`,
                 type: 'success',

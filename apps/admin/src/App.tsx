@@ -8,19 +8,21 @@ import routerProvider, {
 import dataProvider from '@refinedev/simple-rest'
 import {BrowserRouter, Route, Routes, Outlet} from 'react-router'
 import {ConfigProvider, App as AntdApp} from 'antd'
-import {PartitionOutlined, UsbOutlined, NodeExpandOutlined, ControlOutlined, OneToOneOutlined, SoundOutlined} from '@ant-design/icons'
+import {PartitionOutlined, UsbOutlined, NodeExpandOutlined, ControlOutlined, OneToOneOutlined, SoundOutlined, ApiOutlined} from '@ant-design/icons'
 import {useNotificationProvider, ThemedLayout, ErrorComponent} from '@refinedev/antd'
 import '@refinedev/antd/dist/reset.css'
 import DeviceList from "@/pages/devices/list.tsx";
 import DeviceCreate from "@/pages/devices/create.tsx";
-import PipelineList from "@/pages/pipelines/list.tsx";
-import PipelineCreate from "@/pages/pipelines/create.tsx";
-import MixerList from "@/pages/mixers/list.tsx";
-import MixerCreate from "@/pages/mixers/create.tsx";
-import MixerEdit from "@/pages/mixers/edit.tsx";
+import CamillaDSPPipelineList from "@/pages/camilladsp/pipelines/list.tsx";
+import CamillaDSPPipelineCreate from "@/pages/camilladsp/pipelines/create.tsx";
+import MixerList from "@/pages/camilladsp/mixers/list.tsx";
+import MixerCreate from "@/pages/camilladsp/mixers/create.tsx";
+import MixerEdit from "@/pages/camilladsp/mixers/edit.tsx";
 import {Dashboard} from "@/pages/dashboard";
 import {ColorModeContextProvider} from "./contexts/color-mode";
 import AudioBackendPreferenceList from "@/pages/preferences/list.tsx";
+import PipelineList from "@/pages/pipelines/list.tsx";
+import PipelineEdit from "@/pages/pipelines/edit.tsx";
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
@@ -46,6 +48,15 @@ function App() {
                                         create: '/devices/create',
                                         meta: {
                                             icon: <UsbOutlined/>
+                                        }
+                                    },
+                                    {
+                                        name: 'pipelines',
+                                        list: '/pipelines',
+                                        create: '/pipelines/create',
+                                        edit: '/pipelines/edit/:id',
+                                        meta: {
+                                            icon: <ApiOutlined/>
                                         }
                                     },
                                     {
@@ -118,9 +129,13 @@ function App() {
                                             <Route index element={<DeviceList/>}/>
                                             <Route path="create" element={<DeviceCreate/>}/>
                                         </Route>
-                                        <Route path="/camilladsp/pipelines">
+                                        <Route path="/pipelines">
                                             <Route index element={<PipelineList/>}/>
-                                            <Route path="create" element={<PipelineCreate/>}/>
+                                            <Route path="edit/:id" element={<PipelineEdit/>}/>
+                                        </Route>
+                                        <Route path="/camilladsp/pipelines">
+                                            <Route index element={<CamillaDSPPipelineList/>}/>
+                                            <Route path="create" element={<CamillaDSPPipelineCreate/>}/>
                                         </Route>
                                         <Route path="/camilladsp/mixers">
                                             <Route index element={<MixerList/>}/>

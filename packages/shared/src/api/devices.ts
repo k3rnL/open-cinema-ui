@@ -1,13 +1,13 @@
 import {apiClient} from './client'
-import type {Device} from '../types'
+import type {AudioDevice} from '../types'
 
 export const devicesApi = {
-    getAll: () => apiClient.get<Device[]>('/devices'),
+    getAll: () => apiClient.get<AudioDevice[]>('/devices'),
 
-    getById: (id: string) => apiClient.get<Device>(`/devices/${id}`),
+    getById: (id: string) => apiClient.get<AudioDevice>(`/devices/${id}`),
 
-    create: (device: Omit<Device, 'id' | 'active' | 'lastSeen'>) =>
-        apiClient.post<Device>('/devices', device),
+    create: (device: Omit<AudioDevice, 'id' | 'active' | 'lastSeen'>) =>
+        apiClient.post<AudioDevice>('/devices', device),
 
     delete: (id: string) => apiClient.delete<void>(`/devices/${id}`),
 

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { devicesApi } from '../api/devices'
-import type { Device } from '../types'
+import type { AudioDevice } from '../types'
 
 export function useDevices() {
   return useQuery({
@@ -21,7 +21,7 @@ export function useCreateDevice() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (device: Omit<Device, 'id'>) => devicesApi.create(device),
+    mutationFn: (device: Omit<AudioDevice, 'id'>) => devicesApi.create(device),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
     },

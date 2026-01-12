@@ -1,9 +1,9 @@
 import { Create, useForm } from '@refinedev/antd'
 import { Form, Input, Select } from 'antd'
-import type { Device } from '@open-cinema/shared'
+import type { AudioDevice } from '@open-cinema/shared'
 
 export default function DeviceCreate() {
-  const { formProps, saveButtonProps } = useForm<Device>({
+  const { formProps, saveButtonProps } = useForm<AudioDevice>({
     redirect: 'list',
   })
 

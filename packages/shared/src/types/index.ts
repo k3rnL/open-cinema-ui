@@ -1,8 +1,12 @@
-export interface Device {
+export interface AudioDevice {
   id: string
   name: string
   device_type: 'CAPTURE' | 'PLAYBACK'
   active: boolean
+  backend?: string
+  format?: string
+  sample_rate?: number
+  channels?: number
   lastSeen?: Date
 }
 
@@ -25,5 +29,5 @@ export interface SystemStatus {
   power: boolean
   currentSource?: VideoSource
   audio: AudioSettings
-  devices: Device[]
+  devices: AudioDevice[]
 }
