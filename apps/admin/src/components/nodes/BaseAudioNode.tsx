@@ -2,6 +2,7 @@ import { Handle, Position, NodeProps } from 'reactflow'
 import { Badge, Card, Space, Typography } from 'antd'
 import { AudioDevice } from '@open-cinema/shared'
 import { ReactNode } from 'react'
+import NodeToolbarActions from './NodeToolbarActions'
 
 const { Text } = Typography
 
@@ -11,6 +12,7 @@ interface BaseAudioNodeProps extends NodeProps<AudioDevice> {
     handleType: 'source' | 'target'
     handlePosition: Position
     nodeLabel: string
+    onDelete?: () => void
 }
 
 export default function BaseAudioNode({
@@ -20,10 +22,17 @@ export default function BaseAudioNode({
     color,
     handleType,
     handlePosition,
-    nodeLabel
+    nodeLabel,
+    onDelete
 }: BaseAudioNodeProps) {
     return (
-        <Card
+        <>
+            <NodeToolbarActions
+                onDelete={onDelete}
+                isVisible={selected}
+                actions={[]}
+            />
+            <Card
             size="small"
             title={
                 <Space>
@@ -59,6 +68,17 @@ export default function BaseAudioNode({
             <Handle
                 type={handleType}
                 position={handlePosition}
+                id={'h-1'}
+                style={{
+                    background: color,
+                    width: 10,
+                    height: 10,
+                }}
+            />
+            <Handle
+                type={handleType}
+                position={handlePosition}
+                id={'h-2'}
                 style={{
                     background: color,
                     width: 10,
@@ -83,5 +103,6 @@ export default function BaseAudioNode({
                 )}
             </Space>
         </Card>
+        </>
     )
 }

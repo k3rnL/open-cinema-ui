@@ -75,10 +75,16 @@ function PipelineFlowEditor({ pipeline, devices, onGraphChange }: {
         setEdges(loadedEdges)
     }, [pipeline, devices, setNodes, setEdges])
 
+    // Delete node function
+    const deleteNode = useCallback((nodeId: string) => {
+        setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+        setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+    }, [setNodes, setEdges]);
+
     const nodeTypes = useMemo(() => ({
-        audioInput: AudioInputNode,
-        audioOutput: AudioOutputNode,
-    }), []);
+        audioInput: (props: any) => <AudioInputNode {...props} data={{ ...props.data, onDelete: () => deleteNode(props.id) }} />,
+        audioOutput: (props: any) => <AudioOutputNode {...props} data={{ ...props.data, onDelete: () => deleteNode(props.id) }} />,
+    }), [deleteNode]);
 
     const onConnect = useCallback(
         (params: Connection) => setEdges((eds) => addEdge(params, eds)),

@@ -3,7 +3,7 @@ import { SoundOutlined } from '@ant-design/icons'
 import { AudioDevice } from '@open-cinema/shared'
 import BaseAudioNode from './BaseAudioNode'
 
-export default function AudioOutputNode(props: NodeProps<AudioDevice>) {
+export default function AudioOutputNode(props: NodeProps<AudioDevice & { onDelete?: () => void }>) {
     return (
         <BaseAudioNode
             {...props}
@@ -12,6 +12,7 @@ export default function AudioOutputNode(props: NodeProps<AudioDevice>) {
             handleType="target"
             handlePosition={Position.Left}
             nodeLabel="Audio Output"
+            onDelete={props.data.onDelete}
         />
     )
 }
