@@ -1,9 +1,21 @@
 import {Edit, useForm} from "@refinedev/antd";
 import 'reactflow/dist/style.css';
 import './reactflow-custom.css';
-import {HttpError, useList} from "@refinedev/core";
+import {HttpError, useApiUrl, useCustom, useList, useOne} from "@refinedev/core";
 import {Badge, Button, Dropdown, Form, Space, Spin} from "antd";
-import ReactFlow, {Background, BackgroundVariant, Controls, MiniMap, ReactFlowProvider, Node, Edge, useNodesState, useEdgesState, addEdge, Connection} from "reactflow";
+import ReactFlow, {
+    Background,
+    BackgroundVariant,
+    Controls,
+    MiniMap,
+    ReactFlowProvider,
+    Node,
+    Edge,
+    useNodesState,
+    useEdgesState,
+    addEdge,
+    Connection
+} from "reactflow";
 import {useCallback, useContext, useEffect, useMemo} from "react";
 import useLayoutNodes from "../../hooks/useLayoutNodes";
 import {PartitionOutlined} from "@ant-design/icons";
@@ -11,6 +23,17 @@ import AudioInputNode from "../../components/nodes/AudioInputNode";
 import AudioOutputNode from "../../components/nodes/AudioOutputNode";
 import {ColorModeContext} from "@/contexts/color-mode";
 import {AudioDevice} from "@open-cinema/shared";
+
+interface PipelineSchematicsField {
+    name: string,
+    type: string,
+    help_text: string,
+    choices: { label: string, value: string }[]
+}
+
+interface PipelineSchematics {
+    io: { name: string, fields: PipelineSchematicsField[] }[]
+}
 
 interface PipelineNode {
     id: number
@@ -31,15 +54,16 @@ interface Pipeline {
     edges: PipelineEdge[]
 }
 
-function PipelineFlowEditor({ pipeline, devices, onGraphChange }: {
+function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
     pipeline: Pipeline,
     devices: AudioDevice[],
-    onGraphChange: (nodes: Node[], edges: Edge[]) => void
+    onGraphChange: (nodes: Node[], edges: Edge[]) => void,
+    schematics: PipelineSchematics
 }) {
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-    const { applyAutoLayout } = useLayoutNodes();
-    const { mode } = useContext(ColorModeContext);
+    const {applyAutoLayout} = useLayoutNodes();
+    const {mode} = useContext(ColorModeContext);
 
     const isDark = mode === 'dark';
 
@@ -53,7 +77,7 @@ function PipelineFlowEditor({ pipeline, devices, onGraphChange }: {
             return {
                 id: `node-${node.id}`,
                 type: node.kind === 'input' ? 'audioInput' : 'audioOutput',
-                position: { x: index * 300, y: index * 150 },
+                position: {x: index * 300, y: index * 150},
                 data: device || {
                     id: node.parameters?.deviceId || '',
                     name: node.plugin,
@@ -82,8 +106,10 @@ function PipelineFlowEditor({ pipeline, devices, onGraphChange }: {
     }, [setNodes, setEdges]);
 
     const nodeTypes = useMemo(() => ({
-        audioInput: (props: any) => <AudioInputNode {...props} data={{ ...props.data, onDelete: () => deleteNode(props.id) }} />,
-        audioOutput: (props: any) => <AudioOutputNode {...props} data={{ ...props.data, onDelete: () => deleteNode(props.id) }} />,
+        audioInput: (props: any) => <AudioInputNode {...props}
+                                                    data={{...props.data, onDelete: () => deleteNode(props.id)}}/>,
+        audioOutput: (props: any) => <AudioOutputNode {...props}
+                                                      data={{...props.data, onDelete: () => deleteNode(props.id)}}/>,
     }), [deleteNode]);
 
     const onConnect = useCallback(
@@ -113,7 +139,7 @@ function PipelineFlowEditor({ pipeline, devices, onGraphChange }: {
         const newNode: Node = {
             id: `input-${device.id}-${Date.now()}`,
             type: 'audioInput',
-            position: { x: Math.random() * 400, y: Math.random() * 300 },
+            position: {x: Math.random() * 400, y: Math.random() * 300},
             data: device
         };
         const newNodes = [...nodes, newNode];
@@ -125,9 +151,22 @@ function PipelineFlowEditor({ pipeline, devices, onGraphChange }: {
         const newNode: Node = {
             id: `output-${device.id}-${Date.now()}`,
             type: 'audioOutput',
-            position: { x: Math.random() * 400, y: Math.random() * 300 },
+            position: {x: Math.random() * 400, y: Math.random() * 300},
             data: device
         };
+        const newNodes = [...nodes, newNode];
+        setNodes(newNodes);
+        onGraphChange(newNodes, edges);
+    }, [nodes, edges, setNodes, onGraphChange]);
+
+    const addIONode = useCallback((name: string) => {
+        const newNode: Node = {
+            id: `ionode-${name}-${Date.now()}`,
+            type: 'io',
+            position: {x: Math.random() * 400, y: Math.random() * 300},
+            data: {name}
+        }
+
         const newNodes = [...nodes, newNode];
         setNodes(newNodes);
         onGraphChange(newNodes, edges);
@@ -158,16 +197,27 @@ function PipelineFlowEditor({ pipeline, devices, onGraphChange }: {
         onClick: () => addOutputNode(device),
     }))
 
+    const schematicsDropdown = schematics.io.map(({name}) => ({
+        key: name,
+        label: (
+            <Space>{name}</Space>
+        ),
+        onClick: () => addIONode(name),
+    }))
+
     return (
         <>
-            <Space style={{ marginBottom: 16 }}>
+            <Space style={{marginBottom: 16}}>
                 <Dropdown menu={{items: inputDevicesDropdown}}>
                     <Button>Add audio source</Button>
                 </Dropdown>
                 <Dropdown menu={{items: outputDevicesDropdown}}>
                     <Button>Add audio output</Button>
                 </Dropdown>
-                <Button icon={<PartitionOutlined />} onClick={applyAutoLayout}>
+                <Dropdown menu={{items: schematicsDropdown}}>
+                    <Button>Add Others</Button>
+                </Dropdown>
+                <Button icon={<PartitionOutlined/>} onClick={applyAutoLayout}>
                     Auto Layout
                 </Button>
             </Space>
@@ -180,7 +230,7 @@ function PipelineFlowEditor({ pipeline, devices, onGraphChange }: {
                     onEdgesChange={handleEdgesChange}
                     onConnect={handleConnect}
                     fitView
-                    style={{ background: isDark ? '#141414' : '#fff' }}
+                    style={{background: isDark ? '#141414' : '#fff'}}
                 >
                     <Controls
                         style={{
@@ -208,12 +258,19 @@ function PipelineFlowEditor({ pipeline, devices, onGraphChange }: {
 }
 
 export default function PipelineEdit() {
-    const {formProps, saveButtonProps, query, form} = useForm<Pipeline>({
+    const {formProps, saveButtonProps, query: pipelineQuery, form} = useForm<Pipeline>({
         redirect: 'list',
     })
 
     const {result: devicesResult} = useList<AudioDevice, HttpError>({
         resource: "devices",
+    })
+
+    const apiUrl = useApiUrl()
+
+    const {query: schematicsQuery} = useCustom<PipelineSchematics>({
+        url: `${apiUrl}/pipelines/schematics`,
+        method: 'get'
     })
 
     // Transform ReactFlow graph to backend format
@@ -242,8 +299,8 @@ export default function PipelineEdit() {
         })
     }, [form])
 
-    const isLoading = query?.isLoading
-    const isError = query?.isError
+    const isLoading = pipelineQuery?.isLoading || schematicsQuery?.isLoading
+    const isError = pipelineQuery?.isError || schematicsQuery?.isError
 
     if (isLoading) {
         return <Spin/>
@@ -254,21 +311,23 @@ export default function PipelineEdit() {
     }
 
     const devices = devicesResult.data || []
-    const pipeline = query?.data?.data!
+    const pipeline = pipelineQuery?.data?.data!
+    const schematics = schematicsQuery?.data?.data!
 
     return (
         <Edit saveButtonProps={saveButtonProps} canDelete>
             <Form {...formProps} layout="vertical">
                 <Form.Item name="nodes" hidden>
-                    <input />
+                    <input/>
                 </Form.Item>
                 <Form.Item name="edges" hidden>
-                    <input />
+                    <input/>
                 </Form.Item>
                 <ReactFlowProvider>
                     <PipelineFlowEditor
                         pipeline={pipeline}
                         devices={devices}
+                        schematics={schematics}
                         onGraphChange={handleGraphChange}
                     />
                 </ReactFlowProvider>
