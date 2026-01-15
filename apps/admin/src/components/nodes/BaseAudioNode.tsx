@@ -1,18 +1,20 @@
 import {Handle, Position} from 'reactflow'
 import {Badge, Space, Typography} from 'antd'
-import {AudioDevice} from '@open-cinema/shared'
 import BaseNode, {BaseNodeProps} from "@/components/nodes/BaseNode.tsx";
+import {NodeData} from "@/pages/pipelines/edit.tsx";
+import {AudioDevice} from "@open-cinema/shared";
 
 const {Text} = Typography
 
-export interface BaseAudioNodeProps extends BaseNodeProps<AudioDevice> {
+export interface BaseAudioNodeProps extends BaseNodeProps<NodeData> {
     handleType: 'source' | 'target'
     handlePosition: Position
+    device: AudioDevice
 }
 
 export default function BaseAudioNode(props: BaseAudioNodeProps) {
     const {
-        data: device,
+        device,
         handleType,
         handlePosition,
         color,

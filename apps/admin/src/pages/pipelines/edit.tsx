@@ -62,6 +62,12 @@ interface Pipeline {
     edges: PipelineEdge[]
 }
 
+export interface NodeData {
+    name: string,
+    fieldValues?: Record<string, any>,
+    onFieldValuesChange?: (nodeId: string, values: Record<string, any>) => void
+}
+
 function pipelineNodeToReactFlowNode(node: PipelineNode, index: number, devices: AudioDevice[], schematics: PipelineSchematics, handleFieldValuesChange: (nodeId: string, fieldValues: Record<string, any>) => void): Node {
     if (node.name === 'AudioPipelineDeviceNode') {
         const device = devices.find(d => d.id === node.fields['device'])!
@@ -70,7 +76,11 @@ function pipelineNodeToReactFlowNode(node: PipelineNode, index: number, devices:
             id: `node-${node.id}`,
             type: device?.device_type === 'CAPTURE' ? 'audioInput' : 'audioOutput',
             position: {x: index * 300, y: index * 150},
-            data: device
+            data: {
+                name: 'AudioPipelineDeviceNode',
+                fieldValues: node.fields,
+                onFieldValuesChange: handleFieldValuesChange
+            }
         }
     }
 
@@ -82,7 +92,7 @@ function pipelineNodeToReactFlowNode(node: PipelineNode, index: number, devices:
         console.warn(`Schematic for ${node.name} not found`)
 
     return {
-        id: `ionode-${node.name}-${Date.now()}`,
+        id: `node-${node.name}-${Date.now()}`,
         type: 'generic',
         position: {x: Math.random() * 400, y: Math.random() * 300},
         data: {
@@ -133,9 +143,9 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
     }, [setNodes, setEdges]);
 
     const nodeTypes = useMemo(() => ({
-        audioInput: (props: any) => <AudioInputNode {...props} data={props.data}
+        audioInput: (props: any) => <AudioInputNode {...props} data={props.data} device={devices.find(d => d.id === props.data.fieldValues?.device)!}
                                                     onDelete={() => deleteNode(props.id)}/>,
-        audioOutput: (props: any) => <AudioOutputNode {...props} data={props.data}
+        audioOutput: (props: any) => <AudioOutputNode {...props} data={props.data} device={devices.find(d => d.id === props.data.fieldValues?.device)!}
                                                       onDelete={() => deleteNode(props.id)}/>,
         generic: (props: any) => <GenericNode {...props} data={props.data} onDelete={() => deleteNode(props.id)}/>,
     }), [deleteNode]);
@@ -164,11 +174,15 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
 
     // Add node functions
     const addInputNode = useCallback((device: AudioDevice) => {
-        const newNode: Node = {
+        const newNode: Node<NodeData> = {
             id: `input-${device.id}-${Date.now()}`,
             type: 'audioInput',
             position: {x: Math.random() * 400, y: Math.random() * 300},
-            data: device
+            data: {
+                name: 'AudioPipelineDeviceNode',
+                fieldValues: {device: device.id},
+                onFieldValuesChange: handleFieldValuesChange
+            }
         };
         const newNodes = [...nodes, newNode];
         setNodes(newNodes);
@@ -176,11 +190,15 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
     }, [nodes, edges, setNodes, onGraphChange]);
 
     const addOutputNode = useCallback((device: AudioDevice) => {
-        const newNode: Node = {
+        const newNode: Node<NodeData> = {
             id: `output-${device.id}-${Date.now()}`,
             type: 'audioOutput',
             position: {x: Math.random() * 400, y: Math.random() * 300},
-            data: device
+            data: {
+            name: 'AudioPipelineDeviceNode',
+                fieldValues: {device: device.id},
+            onFieldValuesChange: handleFieldValuesChange
+        }
         };
         const newNodes = [...nodes, newNode];
         setNodes(newNodes);
@@ -324,7 +342,8 @@ export default function PipelineEdit() {
     const handleGraphChange = useCallback((nodes: Node[], edges: Edge[]) => {
         const transformedNodes = nodes.map((node) => {
             const common = {
-                name: node.data.name
+                name: node.data.name,
+                fields: node.data.fieldValues || {}
             }
             if (node.type === 'generic')
                 return {
