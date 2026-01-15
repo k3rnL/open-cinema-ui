@@ -25,6 +25,23 @@ import {ColorModeContext} from "@/contexts/color-mode";
 import {AudioDevice} from "@open-cinema/shared";
 import GenericNode from "@/components/nodes/GenericNode.tsx";
 
+export enum SlotDirection {
+    INPUT = "INPUT",
+    OUTPUT = "OUTPUT",
+    ALL = "ALL",
+}
+
+export enum SlotType {
+    AUDIO = "AUDIO",
+    CONTROL = "CONTROL",
+}
+
+export interface Slot {
+    name: string;
+    type: SlotType;
+    direction: SlotDirection;
+}
+
 export interface PipelineSchematicsField {
     name: string,
     type: string,
@@ -37,6 +54,7 @@ export interface PipelineSchematic {
     name: string,
     fields: PipelineSchematicsField[],
     fieldValues?: Record<string, any>,
+    slots: Slot[],
     onFieldValuesChange?: (nodeId: string, values: Record<string, any>) => void
 }
 
@@ -47,6 +65,7 @@ interface PipelineSchematics {
 interface PipelineNode {
     id: number
     name: string
+    dynamic_slots_schematics: Slot[]
     fields: Record<string, any>
 }
 
@@ -92,12 +111,13 @@ function pipelineNodeToReactFlowNode(node: PipelineNode, index: number, devices:
         console.warn(`Schematic for ${node.name} not found`)
 
     return {
-        id: `node-${node.name}-${Date.now()}`,
+        id: `node-${node.id}`,
         type: 'generic',
         position: {x: Math.random() * 400, y: Math.random() * 300},
         data: {
             ...schematic,
             fieldValues: node.fields,
+            dynamicSlotsSchematics: node.dynamic_slots_schematics,
             onFieldValuesChange: handleFieldValuesChange
         }
     }
@@ -134,7 +154,10 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
 
         setNodes(loadedNodes)
         setEdges(loadedEdges)
-    }, [pipeline, devices, setNodes, setEdges])
+
+        // Apply auto layout after nodes are loaded
+        setTimeout(() => applyAutoLayout(), 100)
+    }, [pipeline, devices, setNodes, setEdges, applyAutoLayout])
 
     // Delete node function
     const deleteNode = useCallback((nodeId: string) => {
@@ -147,7 +170,7 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
                                                     onDelete={() => deleteNode(props.id)}/>,
         audioOutput: (props: any) => <AudioOutputNode {...props} data={props.data} device={devices.find(d => d.id === props.data.fieldValues?.device)!}
                                                       onDelete={() => deleteNode(props.id)}/>,
-        generic: (props: any) => <GenericNode {...props} data={props.data} onDelete={() => deleteNode(props.id)}/>,
+        generic: (props: any) => <GenericNode {...props} data={props.data} dynamicSlotsSchematics={props.data.dynamicSlotsSchematics} onDelete={() => deleteNode(props.id)}/>,
     }), [deleteNode]);
 
     const onConnect = useCallback(
@@ -341,6 +364,7 @@ export default function PipelineEdit() {
     // Transform ReactFlow graph to backend format
     const handleGraphChange = useCallback((nodes: Node[], edges: Edge[]) => {
         const transformedNodes = nodes.map((node) => {
+            // Convert to backend format
             const common = {
                 name: node.data.name,
                 fields: node.data.fieldValues || {}
