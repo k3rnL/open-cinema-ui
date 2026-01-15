@@ -1,7 +1,7 @@
 import {Edit, useForm} from "@refinedev/antd";
 import 'reactflow/dist/style.css';
 import './reactflow-custom.css';
-import {HttpError, useApiUrl, useCustom, useList, useOne} from "@refinedev/core";
+import {HttpError, useApiUrl, useCustom, useList} from "@refinedev/core";
 import {Badge, Button, Dropdown, Form, Space, Spin} from "antd";
 import ReactFlow, {
     Background,
@@ -23,23 +23,31 @@ import AudioInputNode from "../../components/nodes/AudioInputNode";
 import AudioOutputNode from "../../components/nodes/AudioOutputNode";
 import {ColorModeContext} from "@/contexts/color-mode";
 import {AudioDevice} from "@open-cinema/shared";
+import GenericNode from "@/components/nodes/GenericNode.tsx";
 
-interface PipelineSchematicsField {
+export interface PipelineSchematicsField {
     name: string,
     type: string,
     help_text: string,
-    choices: { label: string, value: string }[]
+    choices: { label: string, value: string }[],
+    nullable: boolean,
+}
+
+export interface PipelineSchematic {
+    name: string,
+    fields: PipelineSchematicsField[],
+    fieldValues?: Record<string, any>,
+    onFieldValuesChange?: (nodeId: string, values: Record<string, any>) => void
 }
 
 interface PipelineSchematics {
-    io: { name: string, fields: PipelineSchematicsField[] }[]
+    io: PipelineSchematic[]
 }
 
 interface PipelineNode {
     id: number
-    kind: string
-    plugin: string
-    parameters: any
+    name: string
+    fields: Record<string, any>
 }
 
 interface PipelineEdge {
@@ -52,6 +60,37 @@ interface Pipeline {
     name: string
     nodes: PipelineNode[]
     edges: PipelineEdge[]
+}
+
+function pipelineNodeToReactFlowNode(node: PipelineNode, index: number, devices: AudioDevice[], schematics: PipelineSchematics, handleFieldValuesChange: (nodeId: string, fieldValues: Record<string, any>) => void): Node {
+    if (node.name === 'AudioPipelineDeviceNode') {
+        const device = devices.find(d => d.id === node.fields['device'])!
+
+        return {
+            id: `node-${node.id}`,
+            type: device?.device_type === 'CAPTURE' ? 'audioInput' : 'audioOutput',
+            position: {x: index * 300, y: index * 150},
+            data: device
+        }
+    }
+
+    console.warn(node)
+
+    const schematic = schematics.io.find(s => s.name === node.name);
+
+    if (!schematic)
+        console.warn(`Schematic for ${node.name} not found`)
+
+    return {
+        id: `ionode-${node.name}-${Date.now()}`,
+        type: 'generic',
+        position: {x: Math.random() * 400, y: Math.random() * 300},
+        data: {
+            ...schematic,
+            fieldValues: node.fields,
+            onFieldValuesChange: handleFieldValuesChange
+        }
+    }
 }
 
 function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
@@ -72,19 +111,7 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
         if (!pipeline.nodes || pipeline.nodes.length === 0) return
 
         const loadedNodes = pipeline.nodes.map((node, index) => {
-            const device = devices.find(d => d.id === node.parameters?.deviceId)
-
-            return {
-                id: `node-${node.id}`,
-                type: node.kind === 'input' ? 'audioInput' : 'audioOutput',
-                position: {x: index * 300, y: index * 150},
-                data: device || {
-                    id: node.parameters?.deviceId || '',
-                    name: node.plugin,
-                    active: false,
-                    device_type: node.kind === 'input' ? 'CAPTURE' : 'PLAYBACK'
-                } as AudioDevice
-            }
+            return pipelineNodeToReactFlowNode(node, index, devices, schematics, handleFieldValuesChange)
         })
 
         const loadedEdges = pipeline.edges?.map(edge => {
@@ -106,10 +133,11 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
     }, [setNodes, setEdges]);
 
     const nodeTypes = useMemo(() => ({
-        audioInput: (props: any) => <AudioInputNode {...props}
-                                                    data={{...props.data, onDelete: () => deleteNode(props.id)}}/>,
-        audioOutput: (props: any) => <AudioOutputNode {...props}
-                                                      data={{...props.data, onDelete: () => deleteNode(props.id)}}/>,
+        audioInput: (props: any) => <AudioInputNode {...props} data={props.data}
+                                                    onDelete={() => deleteNode(props.id)}/>,
+        audioOutput: (props: any) => <AudioOutputNode {...props} data={props.data}
+                                                      onDelete={() => deleteNode(props.id)}/>,
+        generic: (props: any) => <GenericNode {...props} data={props.data} onDelete={() => deleteNode(props.id)}/>,
     }), [deleteNode]);
 
     const onConnect = useCallback(
@@ -159,18 +187,37 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
         onGraphChange(newNodes, edges);
     }, [nodes, edges, setNodes, onGraphChange]);
 
+    // Handle field values change from GenericNode
+    const handleFieldValuesChange = useCallback((nodeId: string, fieldValues: Record<string, any>) => {
+        setNodes((nds) => {
+            const updatedNodes = nds.map((node) =>
+                node.id === nodeId
+                    ? { ...node, data: { ...node.data, fieldValues } }
+                    : node
+            );
+            // Trigger graph change to update form with the updated nodes
+            setTimeout(() => onGraphChange(updatedNodes, edges), 0);
+            return updatedNodes;
+        });
+    }, [edges, onGraphChange]);
+
     const addIONode = useCallback((name: string) => {
+        const schematic = schematics.io.find(s => s.name === name)!;
         const newNode: Node = {
             id: `ionode-${name}-${Date.now()}`,
-            type: 'io',
+            type: 'generic',
             position: {x: Math.random() * 400, y: Math.random() * 300},
-            data: {name}
+            data: {
+                ...schematic,
+                fieldValues: {},
+                onFieldValuesChange: handleFieldValuesChange
+            }
         }
 
         const newNodes = [...nodes, newNode];
         setNodes(newNodes);
         onGraphChange(newNodes, edges);
-    }, [nodes, edges, setNodes, onGraphChange]);
+    }, [nodes, edges, setNodes, onGraphChange, handleFieldValuesChange, schematics.io]);
 
     const inputDevices = devices.filter((device) => device.device_type === 'CAPTURE')
     const outputDevices = devices.filter((device) => device.device_type === 'PLAYBACK')
@@ -259,7 +306,7 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
 
 export default function PipelineEdit() {
     const {formProps, saveButtonProps, query: pipelineQuery, form} = useForm<Pipeline>({
-        redirect: 'list',
+        redirect: false,
     })
 
     const {result: devicesResult} = useList<AudioDevice, HttpError>({
@@ -275,13 +322,18 @@ export default function PipelineEdit() {
 
     // Transform ReactFlow graph to backend format
     const handleGraphChange = useCallback((nodes: Node[], edges: Edge[]) => {
-        const transformedNodes = nodes.map((node) => ({
-            kind: node.type === 'audioInput' ? 'input' : 'output',
-            plugin: node.data.name || node.data.label,
-            parameters: {
-                deviceId: node.data.id,
-            },
-        }))
+        const transformedNodes = nodes.map((node) => {
+            const common = {
+                name: node.data.name
+            }
+            if (node.type === 'generic')
+                return {
+                    ...common,
+                    fields: node.data.fieldValues || {}
+                }
+
+            return common
+        })
 
         const transformedEdges = edges.map((edge) => {
             const sourceIndex = nodes.findIndex((n) => n.id === edge.source)

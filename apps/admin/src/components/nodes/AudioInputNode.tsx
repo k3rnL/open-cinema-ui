@@ -1,9 +1,8 @@
-import { Position, NodeProps } from 'reactflow'
+import { Position } from 'reactflow'
 import { AudioOutlined } from '@ant-design/icons'
-import { AudioDevice } from '@open-cinema/shared'
-import BaseAudioNode from './BaseAudioNode'
+import BaseAudioNode, {BaseAudioNodeProps} from './BaseAudioNode'
 
-export default function AudioInputNode(props: NodeProps<AudioDevice & { onDelete?: () => void }>) {
+export default function AudioInputNode(props: BaseAudioNodeProps) {
     return (
         <BaseAudioNode
             {...props}
@@ -12,7 +11,6 @@ export default function AudioInputNode(props: NodeProps<AudioDevice & { onDelete
             handleType="source"
             handlePosition={Position.Right}
             nodeLabel="Audio Input"
-            onDelete={props.data.onDelete}
         />
     )
 }

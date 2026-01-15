@@ -5,7 +5,7 @@ import BaseNode, {BaseNodeProps} from "@/components/nodes/BaseNode.tsx";
 
 const {Text} = Typography
 
-interface BaseAudioNodeProps extends BaseNodeProps<AudioDevice> {
+export interface BaseAudioNodeProps extends BaseNodeProps<AudioDevice> {
     handleType: 'source' | 'target'
     handlePosition: Position
 }

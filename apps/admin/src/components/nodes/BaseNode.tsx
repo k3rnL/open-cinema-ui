@@ -1,5 +1,5 @@
 import {ReactNode} from "react";
-import NodeToolbarActions from "@/components/nodes/NodeToolbarActions.tsx";
+import NodeToolbarActions, {NodeToolbarActionsProps} from "@/components/nodes/NodeToolbarActions.tsx";
 import {Card, Space, Typography} from "antd";
 import {NodeProps} from "reactflow";
 
@@ -7,20 +7,21 @@ const {Text} = Typography
 
 export type BaseNodeProps<T> = NodeProps<T> & {
     children?: ReactNode,
+    toolbar: NodeToolbarActionsProps,
     nodeLabel: string | ReactNode,
     onDelete?: () => void,
     icon: ReactNode,
     color: string
 }
 
-export default function BaseNode<T>({children, nodeLabel, onDelete, selected, icon, color}: BaseNodeProps<T>) {
+export default function BaseNode<T>({children, nodeLabel, onDelete, selected, icon, color, toolbar}: BaseNodeProps<T>) {
 
     return (
         <>
             <NodeToolbarActions
+                {...toolbar}
                 onDelete={onDelete}
                 isVisible={selected}
-                actions={[]}
             />
             <Card
                 size="small"
