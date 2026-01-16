@@ -6,6 +6,7 @@ export default function AudioOutputNode(props: BaseAudioNodeProps) {
     return (
         <BaseAudioNode
             {...props}
+            device={props.data.device}
             icon={<SoundOutlined style={{ color: '#52c41a', fontSize: 16 }} />}
             color="#52c41a"
             handleType="target"

@@ -28,17 +28,14 @@ export default function NodeToolbarActions({actions, onDelete, ...toolbarProps}:
         >
             <Space size={30}>
                 {allActions?.map((action, index) => (
-                    (<>
-                            <Button
-                                {...action}
-                                key={index}
-                                type="primary"
-                                size="middle"
-                            >
-                                {action.label}
-                            </Button>
-                        </>
-                    )
+                    <Button
+                        {...action}
+                        key={index}
+                        type="primary"
+                        size="middle"
+                    >
+                        {action.label}
+                    </Button>
                 ))}
             </Space>
         </NodeToolbar>

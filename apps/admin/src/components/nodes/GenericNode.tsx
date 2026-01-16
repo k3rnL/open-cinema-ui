@@ -1,15 +1,15 @@
-import {Divider, Typography} from 'antd'
+import {Divider, Typography, message} from 'antd'
 import BaseNode, {BaseNodeProps} from "@/components/nodes/BaseNode.tsx";
-import {PipelineSchematic, Slot, SlotDirection} from "@/pages/pipelines/edit.tsx";
-import {useState} from "react";
+import {UnifiedNodeData, Slot, SlotDirection} from "@/types/node.ts";
+import {useEffect, useState} from "react";
 import {FieldEditor} from "@/components/nodes/fields/FieldEditor.tsx";
 import {NodeToolbarAction} from "@/components/nodes/NodeToolbarActions.tsx";
 import {Handle, Position} from 'reactflow';
 
 const {Text} = Typography;
 
-interface GenericNodeProps extends BaseNodeProps<PipelineSchematic> {
-    dynamicSlotsSchematics?: Slot[]
+interface GenericNodeProps extends BaseNodeProps<UnifiedNodeData> {
+
 }
 
 function stringToColor(str: string): string {
@@ -98,14 +98,28 @@ function SlotItem({slot, nodeId}: SlotItemProps) {
 }
 
 export default function GenericNode(props: GenericNodeProps) {
+    console.log('GenericNode props:', props);
     const {
-        data: schematic,
-        dynamicSlotsSchematics,
+        data: nodeData,
         selected = false,
         id,
     } = props;
 
-    const [fieldValues, setFieldValues] = useState<Record<string, any>>(schematic.fieldValues || {});
+    const [fieldValues, setFieldValues] = useState<Record<string, any>>(nodeData.fieldValues || {});
+    const [isDirty, setIsDirty] = useState(nodeData.isDirty || false);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Sync field values from parent when they change (but only if not dirty)
+    useEffect(() => {
+        if (!isDirty && nodeData.fieldValues) {
+            setFieldValues(nodeData.fieldValues);
+        }
+    }, [nodeData.fieldValues, isDirty]);
+
+    // Update isDirty when data changes from parent
+    useEffect(() => {
+        setIsDirty(nodeData.isDirty || false);
+    }, [nodeData.isDirty]);
 
     const handleFieldChange = (fieldName: string, value: any) => {
         const newFieldValues = {
@@ -113,31 +127,98 @@ export default function GenericNode(props: GenericNodeProps) {
             [fieldName]: value
         };
         setFieldValues(newFieldValues);
+        setIsDirty(true);
 
-        // Update the node data in React Flow
-        if (props.data.onFieldValuesChange) {
-            props.data.onFieldValuesChange(id, newFieldValues);
+        // Notify parent of field value changes
+        if (nodeData.onFieldValuesChange) {
+            nodeData.onFieldValuesChange(id, newFieldValues);
         }
     };
 
-    const slots = [...schematic.slots, ...(dynamicSlotsSchematics || [])]
+    const handleSave = async () => {
+        if (!nodeData.onSave) {
+            message.error('Save function not configured');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            await nodeData.onSave(id);
+            setIsDirty(false);
+            message.success('Node saved successfully');
+        } catch (error) {
+            message.error('Failed to save node');
+            console.error('Save error:', error);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleClear = () => {
+        setFieldValues({});
+        setIsDirty(true);
+        if (nodeData.onFieldValuesChange) {
+            nodeData.onFieldValuesChange(id, {});
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!nodeData.onDelete) {
+            message.error('Delete function not configured');
+            return;
+        }
+
+        try {
+            await nodeData.onDelete(id);
+        } catch (error) {
+            message.error('Failed to delete node');
+            console.error('Delete error:', error);
+        }
+    };
+
+    const handleReload = async () => {
+        if (!nodeData.onReload) {
+            message.error('Reload function not configured');
+            return;
+        }
+
+        try {
+            await nodeData.onReload(id);
+        } catch (error) {
+            message.error('Failed to reload node');
+            console.error('Reload error:', error);
+        }
+    };
 
     const toolbarActions: NodeToolbarAction[] = [
-        {label: 'Clear', onClick: () => setFieldValues({})},
-        {label: 'Save', onClick: () => setFieldValues({})},
-    ]
+        {label: 'Clear', onClick: handleClear},
+        {label: 'Save', onClick: handleSave, disabled: !isDirty || isSaving},
+        {label: 'Reload', onClick: handleReload, disabled: nodeData.resource.isNew},
+    ];
 
-    const hasFields = schematic.fields && schematic.fields.length > 0;
-    const hasSlots = slots && slots.length > 0;
+    const hasFields = nodeData.fieldDefinitions && nodeData.fieldDefinitions.length > 0;
+    const allSlots = [
+        ...(nodeData.slotDefinitions || []),
+        ...(nodeData.dynamicSlots || [])
+    ];
+    const hasSlots = allSlots.length > 0;
 
     return (
         <>
-            <BaseNode {...props} nodeLabel={schematic.name} color={stringToColor(schematic.name)} toolbar={{actions: toolbarActions}}>
+            <BaseNode
+                {...props}
+                nodeLabel={nodeData.name}
+                color={stringToColor(nodeData.name)}
+                toolbar={{actions: toolbarActions}}
+                onDelete={handleDelete}
+                isDirty={isDirty}
+                isSaving={isSaving}
+            >
                 <div style={{width: '100%'}}>
                     {/* Fields section */}
                     {hasFields && (
                         <>
-                            {schematic.fields.map((field, index) => (
+                            {nodeData.fieldDefinitions.map((field, index) => (
                                 <div key={field.name}>
                                     <FieldEditor
                                         field={field}
@@ -145,7 +226,7 @@ export default function GenericNode(props: GenericNodeProps) {
                                         value={fieldValues[field.name]}
                                         onChange={(value) => handleFieldChange(field.name, value)}
                                     />
-                                    {index < schematic.fields.length - 1 && (
+                                    {index < nodeData.fieldDefinitions.length - 1 && (
                                         <Divider style={{
                                             margin: '8px 0',
                                             borderColor: '#303030',
@@ -168,10 +249,10 @@ export default function GenericNode(props: GenericNodeProps) {
                     {/* Slots section */}
                     {hasSlots && (
                         <>
-                            {slots.map((slot, index) => (
+                            {allSlots.map((slot, index) => (
                                 <div key={slot.name}>
                                     <SlotItem slot={slot} nodeId={id} />
-                                    {index < slots.length - 1 && (
+                                    {index < allSlots.length - 1 && (
                                         <Divider style={{
                                             margin: '4px 0',
                                             borderColor: '#262626',

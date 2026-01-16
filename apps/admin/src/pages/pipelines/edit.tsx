@@ -1,8 +1,8 @@
 import {Edit, useForm} from "@refinedev/antd";
 import 'reactflow/dist/style.css';
 import './reactflow-custom.css';
-import {HttpError, useApiUrl, useCustom, useList} from "@refinedev/core";
-import {Badge, Button, Dropdown, Form, Space, Spin} from "antd";
+import {HttpError, useApiUrl, useCustom, useCustomMutation, useList} from "@refinedev/core";
+import {Badge, Button, Dropdown, Form, message, Space, Spin} from "antd";
 import ReactFlow, {
     Background,
     BackgroundVariant,
@@ -19,108 +19,43 @@ import ReactFlow, {
 import {useCallback, useContext, useEffect, useMemo} from "react";
 import useLayoutNodes from "../../hooks/useLayoutNodes";
 import {PartitionOutlined} from "@ant-design/icons";
-import AudioInputNode from "../../components/nodes/AudioInputNode";
-import AudioOutputNode from "../../components/nodes/AudioOutputNode";
 import {ColorModeContext} from "@/contexts/color-mode";
 import {AudioDevice} from "@open-cinema/shared";
 import GenericNode from "@/components/nodes/GenericNode.tsx";
+import {UnifiedNodeData, FieldDefinition, Slot, NodeSaveResponse, NodeReloadResponse} from "@/types/node.ts";
 
-export enum SlotDirection {
-    INPUT = "INPUT",
-    OUTPUT = "OUTPUT",
-    ALL = "ALL",
-}
+// Re-export types for backward compatibility
+export {SlotDirection, SlotType} from "@/types/node.ts";
+export type {Slot, FieldDefinition as PipelineFieldSchematic} from "@/types/node.ts";
 
-export enum SlotType {
-    AUDIO = "AUDIO",
-    CONTROL = "CONTROL",
-}
-
-export interface Slot {
-    name: string;
-    type: SlotType;
-    direction: SlotDirection;
-}
-
-export interface PipelineSchematicsField {
-    name: string,
-    type: string,
-    help_text: string,
-    choices: { label: string, value: string }[],
-    nullable: boolean,
-}
-
-export interface PipelineSchematic {
-    name: string,
-    fields: PipelineSchematicsField[],
-    fieldValues?: Record<string, any>,
-    slots: Slot[],
-    onFieldValuesChange?: (nodeId: string, values: Record<string, any>) => void
+interface PipelineNodeSchematic {
+    type_name: string;
+    fields: FieldDefinition[];
+    slots: Slot[];
 }
 
 interface PipelineSchematics {
-    io: PipelineSchematic[]
+    io: PipelineNodeSchematic[];
 }
 
 interface PipelineNode {
-    id: number
-    name: string
-    dynamic_slots_schematics: Slot[]
-    fields: Record<string, any>
+    id: number;
+    type_name: string;
+    fields: Record<string, any>;
+    dynamic_slots?: Slot[];
 }
 
 interface PipelineEdge {
-    id: number
-    node_a: number
-    node_b: number
+    id: number;
+    node_a: number;
+    node_b: number;
 }
 
 interface Pipeline {
-    name: string
-    nodes: PipelineNode[]
-    edges: PipelineEdge[]
-}
-
-export interface NodeData {
-    name: string,
-    fieldValues?: Record<string, any>,
-    onFieldValuesChange?: (nodeId: string, values: Record<string, any>) => void
-}
-
-function pipelineNodeToReactFlowNode(node: PipelineNode, index: number, devices: AudioDevice[], schematics: PipelineSchematics, handleFieldValuesChange: (nodeId: string, fieldValues: Record<string, any>) => void): Node {
-    if (node.name === 'AudioPipelineDeviceNode') {
-        const device = devices.find(d => d.id === node.fields['device'])!
-
-        return {
-            id: `node-${node.id}`,
-            type: device?.device_type === 'CAPTURE' ? 'audioInput' : 'audioOutput',
-            position: {x: index * 300, y: index * 150},
-            data: {
-                name: 'AudioPipelineDeviceNode',
-                fieldValues: node.fields,
-                onFieldValuesChange: handleFieldValuesChange
-            }
-        }
-    }
-
-    console.warn(node)
-
-    const schematic = schematics.io.find(s => s.name === node.name);
-
-    if (!schematic)
-        console.warn(`Schematic for ${node.name} not found`)
-
-    return {
-        id: `node-${node.id}`,
-        type: 'generic',
-        position: {x: Math.random() * 400, y: Math.random() * 300},
-        data: {
-            ...schematic,
-            fieldValues: node.fields,
-            dynamicSlotsSchematics: node.dynamic_slots_schematics,
-            onFieldValuesChange: handleFieldValuesChange
-        }
-    }
+    id: number;
+    name: string;
+    nodes: PipelineNode[];
+    edges: PipelineEdge[];
 }
 
 function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
@@ -133,50 +68,265 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const {applyAutoLayout} = useLayoutNodes();
     const {mode} = useContext(ColorModeContext);
+    const {mutateAsync: saveNodeMutation} = useCustomMutation<NodeSaveResponse>();
+    const {mutateAsync: reloadNodeMutation} = useCustomMutation<NodeReloadResponse>();
+    const {mutateAsync: deleteNodeMutation} = useCustomMutation();
 
     const isDark = mode === 'dark';
 
+    const apiUrl = useApiUrl();
+
+    // Handle field values change from nodes
+    const handleFieldValuesChange = useCallback((nodeId: string, fieldValues: Record<string, any>) => {
+        setNodes((nds) => {
+            const updatedNodes = nds.map((node) =>
+                node.id === nodeId
+                    ? {
+                        ...node,
+                        data: {
+                            ...node.data,
+                            fieldValues,
+                            isDirty: true,
+                        },
+                    }
+                    : node
+            );
+            // Trigger graph change to update form
+            setTimeout(() => onGraphChange(updatedNodes, edges), 0);
+            return updatedNodes;
+        });
+    }, [edges, onGraphChange]);
+
+    // Handle node save
+    const handleNodeSave = useCallback(async (nodeId: string) => {
+        const node = nodes.find((n) => n.id === nodeId);
+        if (!node) return;
+
+        const nodeData = node.data as UnifiedNodeData;
+
+        try {
+            const url = nodeData.resource.isNew
+                ? `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes`
+                : `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes/${nodeData.resource.id}`;
+
+            const response = await saveNodeMutation({
+                url,
+                method: nodeData.resource.isNew ? 'post' : 'patch',
+                values: {
+                    type_name: nodeData.resource.kind,
+                    fields: nodeData.fieldValues,
+                },
+            });
+
+            const newNodeId = nodeData.resource.isNew ? `node-${response.data.id}` : nodeId;
+            const savedNodeResourceId = response.data.id || nodeData.resource.id;
+
+            // Update node with new data from backend
+            setNodes((nds) =>
+                nds.map((n) =>
+                    n.id === nodeId
+                        ? {
+                            ...n,
+                            id: newNodeId,
+                            data: {
+                                ...n.data,
+                                resource: {
+                                    ...nodeData.resource,
+                                    id: savedNodeResourceId,
+                                    isNew: false,
+                                },
+                                dynamicSlots: response.data.dynamicSlots || nodeData.dynamicSlots,
+                                isDirty: false,
+                            },
+                        }
+                        : n
+                )
+            );
+
+            // Reload node to get updated dynamic slots
+            try {
+                const reloadResponse = await reloadNodeMutation({
+                    url: `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes/${savedNodeResourceId}`,
+                    method: 'get',
+                    values: {},
+                });
+
+                setNodes((nds) =>
+                    nds.map((n) =>
+                        n.id === newNodeId
+                            ? {
+                                ...n,
+                                data: {
+                                    ...n.data,
+                                    // Update field values and dynamic slots from backend
+                                    fieldValues: reloadResponse.data.fields || n.data.fieldValues,
+                                    dynamicSlots: reloadResponse.data.dynamic_slots_schematics || n.data.dynamicSlots,
+                                },
+                            }
+                            : n
+                    )
+                );
+            } catch (reloadError) {
+                console.warn('Failed to reload node after save:', reloadError);
+                // Don't fail the save operation if reload fails
+            }
+
+            message.success('Node saved successfully');
+        } catch (error: any) {
+            message.error(error?.message || 'Failed to save node');
+            throw error;
+        }
+    }, [nodes, apiUrl, saveNodeMutation, reloadNodeMutation]);
+
+    // Handle node reload
+    const handleNodeReload = useCallback(async (nodeId: string) => {
+        const node = nodes.find((n) => n.id === nodeId);
+        if (!node) return;
+
+        const nodeData = node.data as UnifiedNodeData;
+
+        try {
+            const response = await reloadNodeMutation({
+                url: `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes/${nodeData.resource.id}`,
+                method: 'get',
+                values: {},
+            });
+
+            setNodes((nds) =>
+                nds.map((n) =>
+                    n.id === nodeId
+                        ? {
+                            ...n,
+                            data: {
+                                ...n.data,
+                                // Update field values and dynamic slots from backend
+                                fieldValues: response.data.fields || nodeData.fieldValues,
+                                dynamicSlots: response.data.dynamic_slots_schematics || nodeData.dynamicSlots,
+                            },
+                        }
+                        : n
+                )
+            );
+
+            message.success('Node reloaded successfully');
+        } catch (error: any) {
+            message.error(error?.message || 'Failed to reload node');
+            throw error;
+        }
+    }, [nodes, apiUrl, reloadNodeMutation]);
+
+    // Handle node delete
+    const handleNodeDelete = useCallback(async (nodeId: string) => {
+        const node = nodes.find((n) => n.id === nodeId);
+        if (!node) return;
+
+        const nodeData = node.data as UnifiedNodeData;
+
+        // If it's a new node (not yet saved), just remove it from the graph
+        if (nodeData.resource.isNew) {
+            setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+            setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+            message.success('Node removed');
+            return;
+        }
+
+        // Otherwise, call the backend delete endpoint
+        try {
+            await deleteNodeMutation({
+                url: `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes/${nodeData.resource.id}`,
+                method: 'delete',
+                values: {},
+            });
+
+            // Remove node and its edges from the graph
+            setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+            setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+
+            message.success('Node deleted successfully');
+        } catch (error: any) {
+            message.error(error?.message || 'Failed to delete node');
+            throw error;
+        }
+    }, [nodes, apiUrl, deleteNodeMutation, setNodes, setEdges]);
+
+    // Convert backend pipeline node to ReactFlow node with unified data structure
+    const pipelineNodeToReactFlowNode = useCallback((node: PipelineNode, index: number): Node<UnifiedNodeData> => {
+        const schematic = schematics.io.find(s => s.type_name === node.type_name);
+
+        if (!schematic) {
+            console.warn(`Schematic for ${node.type_name} not found`);
+        }
+
+        console.warn(node)
+
+        return {
+            id: `node-${node.id}`,
+            type: 'generic',
+            position: {x: index * 300, y: index * 150},
+            data: {
+                name: node.type_name,
+                resource: {
+                    id: node.id,
+                    kind: node.type_name,
+                    pipelineId: pipeline.id,
+                    isNew: false,
+                },
+                fieldDefinitions: schematic?.fields || [],
+                fieldValues: node.fields || {},
+                slotDefinitions: schematic?.slots || [],
+                dynamicSlots: node.dynamic_slots || [],
+                isDirty: false,
+                isSaving: false,
+                onFieldValuesChange: handleFieldValuesChange,
+                onSave: handleNodeSave,
+                onReload: handleNodeReload,
+                onDelete: handleNodeDelete,
+            },
+        };
+    }, [pipeline.id, schematics.io, handleFieldValuesChange, handleNodeSave, handleNodeReload, handleNodeDelete]);
+
     // Load pipeline data when component mounts or pipeline changes
     useEffect(() => {
-        if (!pipeline.nodes || pipeline.nodes.length === 0) return
+        if (!pipeline.nodes || pipeline.nodes.length === 0) return;
 
-        const loadedNodes = pipeline.nodes.map((node, index) => {
-            return pipelineNodeToReactFlowNode(node, index, devices, schematics, handleFieldValuesChange)
-        })
+        const loadedNodes = pipeline.nodes.map((node, index) =>
+            pipelineNodeToReactFlowNode(node, index)
+        );
 
-        const loadedEdges = pipeline.edges?.map(edge => {
-            return {
-                id: `edge-${edge.id}`,
-                source: `node-${edge.node_a}`,
-                target: `node-${edge.node_b}`,
-            }
-        }) || []
+        const loadedEdges = pipeline.edges?.map((edge) => ({
+            id: `edge-${edge.id}`,
+            source: `node-${edge.node_a}`,
+            target: `node-${edge.node_b}`,
+        })) || [];
 
-        setNodes(loadedNodes)
-        setEdges(loadedEdges)
+        setNodes(loadedNodes);
+        setEdges(loadedEdges);
 
         // Apply auto layout after nodes are loaded
-        setTimeout(() => applyAutoLayout(), 100)
-    }, [pipeline, devices, setNodes, setEdges, applyAutoLayout])
+        setTimeout(() => applyAutoLayout(), 100);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pipeline.id, pipeline.nodes?.length]); // Only reload when pipeline ID or node count changes
 
-    // Delete node function
-    const deleteNode = useCallback((nodeId: string) => {
-        setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-        setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
-    }, [setNodes, setEdges]);
+    // Update node callbacks when they change
+    useEffect(() => {
+        setNodes((nds) =>
+            nds.map((node) => ({
+                ...node,
+                data: {
+                    ...node.data,
+                    onFieldValuesChange: handleFieldValuesChange,
+                    onSave: handleNodeSave,
+                    onReload: handleNodeReload,
+                    onDelete: handleNodeDelete,
+                },
+            }))
+        );
+    }, [handleFieldValuesChange, handleNodeSave, handleNodeReload, handleNodeDelete]);
 
+    // All nodes use GenericNode now
     const nodeTypes = useMemo(() => ({
-        audioInput: (props: any) => <AudioInputNode {...props} data={props.data} device={devices.find(d => d.id === props.data.fieldValues?.device)!}
-                                                    onDelete={() => deleteNode(props.id)}/>,
-        audioOutput: (props: any) => <AudioOutputNode {...props} data={props.data} device={devices.find(d => d.id === props.data.fieldValues?.device)!}
-                                                      onDelete={() => deleteNode(props.id)}/>,
-        generic: (props: any) => <GenericNode {...props} data={props.data} dynamicSlotsSchematics={props.data.dynamicSlotsSchematics} onDelete={() => deleteNode(props.id)}/>,
-    }), [deleteNode]);
-
-    const onConnect = useCallback(
-        (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-        [setEdges]
-    );
+        generic: (props: any) => <GenericNode {...props} />,
+    }), []);
 
     // Notify parent of changes
     const handleNodesChange = useCallback((changes: any) => {
@@ -195,73 +345,94 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
         onGraphChange(nodes, newEdges);
     }, [edges, nodes, setEdges, onGraphChange]);
 
-    // Add node functions
-    const addInputNode = useCallback((device: AudioDevice) => {
-        const newNode: Node<NodeData> = {
-            id: `input-${device.id}-${Date.now()}`,
-            type: 'audioInput',
-            position: {x: Math.random() * 400, y: Math.random() * 300},
-            data: {
-                name: 'AudioPipelineDeviceNode',
-                fieldValues: {device: device.id},
-                onFieldValuesChange: handleFieldValuesChange
-            }
-        };
-        const newNodes = [...nodes, newNode];
-        setNodes(newNodes);
-        onGraphChange(newNodes, edges);
-    }, [nodes, edges, setNodes, onGraphChange]);
-
-    const addOutputNode = useCallback((device: AudioDevice) => {
-        const newNode: Node<NodeData> = {
-            id: `output-${device.id}-${Date.now()}`,
-            type: 'audioOutput',
-            position: {x: Math.random() * 400, y: Math.random() * 300},
-            data: {
-            name: 'AudioPipelineDeviceNode',
-                fieldValues: {device: device.id},
-            onFieldValuesChange: handleFieldValuesChange
+    // Add new node
+    const addNode = useCallback((schematicName: string) => {
+        const schematic = schematics.io.find(s => s.type_name === schematicName);
+        if (!schematic) {
+            message.error(`Schematic ${schematicName} not found`);
+            return;
         }
-        };
-        const newNodes = [...nodes, newNode];
-        setNodes(newNodes);
-        onGraphChange(newNodes, edges);
-    }, [nodes, edges, setNodes, onGraphChange]);
 
-    // Handle field values change from GenericNode
-    const handleFieldValuesChange = useCallback((nodeId: string, fieldValues: Record<string, any>) => {
-        setNodes((nds) => {
-            const updatedNodes = nds.map((node) =>
-                node.id === nodeId
-                    ? { ...node, data: { ...node.data, fieldValues } }
-                    : node
-            );
-            // Trigger graph change to update form with the updated nodes
-            setTimeout(() => onGraphChange(updatedNodes, edges), 0);
-            return updatedNodes;
-        });
-    }, [edges, onGraphChange]);
+        const tempId = `temp-${Date.now()}`;
 
-    const addIONode = useCallback((name: string) => {
-        const schematic = schematics.io.find(s => s.name === name)!;
-        const newNode: Node = {
-            id: `ionode-${name}-${Date.now()}`,
+        const newNode: Node<UnifiedNodeData> = {
+            id: tempId,
             type: 'generic',
             position: {x: Math.random() * 400, y: Math.random() * 300},
             data: {
-                ...schematic,
+                name: schematic.type_name,
+                resource: {
+                    id: tempId,
+                    kind: schematic.type_name,
+                    pipelineId: pipeline.id,
+                    isNew: true,
+                },
+                fieldDefinitions: schematic.fields,
                 fieldValues: {},
-                onFieldValuesChange: handleFieldValuesChange
-            }
-        }
+                slotDefinitions: schematic.slots,
+                dynamicSlots: [],
+                isDirty: true, // New nodes are dirty by default
+                isSaving: false,
+                onFieldValuesChange: handleFieldValuesChange,
+                onSave: handleNodeSave,
+                onReload: handleNodeReload,
+                onDelete: handleNodeDelete,
+            },
+        };
 
         const newNodes = [...nodes, newNode];
         setNodes(newNodes);
         onGraphChange(newNodes, edges);
-    }, [nodes, edges, setNodes, onGraphChange, handleFieldValuesChange, schematics.io]);
+    }, [pipeline.id, schematics.io, nodes, edges, handleFieldValuesChange, handleNodeSave, handleNodeReload, handleNodeDelete, setNodes, onGraphChange]);
 
-    const inputDevices = devices.filter((device) => device.device_type === 'CAPTURE')
-    const outputDevices = devices.filter((device) => device.device_type === 'PLAYBACK')
+    const schematicsDropdown = schematics.io.map(({type_name}) => ({
+        key: type_name,
+        label: <Space>{type_name}</Space>,
+        onClick: () => addNode(type_name),
+    }));
+
+    // Audio device dropdown menus
+    const inputDevices = devices.filter((device) => device.device_type === 'CAPTURE');
+    const outputDevices = devices.filter((device) => device.device_type === 'PLAYBACK');
+
+    const addAudioDeviceNode = useCallback((device: AudioDevice) => {
+        const tempId = `temp-${Date.now()}`;
+        const schematic = schematics.io.find(s => s.type_name === 'AudioPipelineDeviceNode');
+
+        if (!schematic) {
+            message.error('AudioPipelineDeviceNode schematic not found');
+            return;
+        }
+
+        const newNode: Node<UnifiedNodeData> = {
+            id: tempId,
+            type: 'generic',
+            position: {x: Math.random() * 400, y: Math.random() * 300},
+            data: {
+                name: 'AudioPipelineDeviceNode',
+                resource: {
+                    id: tempId,
+                    kind: 'AudioPipelineDeviceNode',
+                    pipelineId: pipeline.id,
+                    isNew: true,
+                },
+                fieldDefinitions: schematic.fields,
+                fieldValues: {device: device.id},
+                slotDefinitions: schematic.slots,
+                dynamicSlots: [],
+                isDirty: true,
+                isSaving: false,
+                onFieldValuesChange: handleFieldValuesChange,
+                onSave: handleNodeSave,
+                onReload: handleNodeReload,
+                onDelete: handleNodeDelete,
+            },
+        };
+
+        const newNodes = [...nodes, newNode];
+        setNodes(newNodes);
+        onGraphChange(newNodes, edges);
+    }, [pipeline.id, schematics.io, nodes, edges, handleFieldValuesChange, handleNodeSave, handleNodeReload, handleNodeDelete, setNodes, onGraphChange]);
 
     const inputDevicesDropdown = inputDevices.map((device) => ({
         key: device.id,
@@ -271,8 +442,8 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
                 {device.name}
             </Space>
         ),
-        onClick: () => addInputNode(device),
-    }))
+        onClick: () => addAudioDeviceNode(device),
+    }));
 
     const outputDevicesDropdown = outputDevices.map((device) => ({
         key: device.id,
@@ -282,16 +453,8 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
                 {device.name}
             </Space>
         ),
-        onClick: () => addOutputNode(device),
-    }))
-
-    const schematicsDropdown = schematics.io.map(({name}) => ({
-        key: name,
-        label: (
-            <Space>{name}</Space>
-        ),
-        onClick: () => addIONode(name),
-    }))
+        onClick: () => addAudioDeviceNode(device),
+    }));
 
     return (
         <>
@@ -342,81 +505,74 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
                 </ReactFlow>
             </div>
         </>
-    )
+    );
 }
 
 export default function PipelineEdit() {
     const {formProps, saveButtonProps, query: pipelineQuery, form} = useForm<Pipeline>({
         redirect: false,
-    })
+    });
+
+    const apiUrl = useApiUrl();
 
     const {result: devicesResult} = useList<AudioDevice, HttpError>({
         resource: "devices",
-    })
-
-    const apiUrl = useApiUrl()
+    });
 
     const {query: schematicsQuery} = useCustom<PipelineSchematics>({
         url: `${apiUrl}/pipelines/schematics`,
         method: 'get'
-    })
+    });
 
     // Transform ReactFlow graph to backend format
     const handleGraphChange = useCallback((nodes: Node[], edges: Edge[]) => {
         const transformedNodes = nodes.map((node) => {
-            // Convert to backend format
-            const common = {
-                name: node.data.name,
-                fields: node.data.fieldValues || {}
-            }
-            if (node.type === 'generic')
-                return {
-                    ...common,
-                    fields: node.data.fieldValues || {}
-                }
-
-            return common
-        })
+            const nodeData = node.data as UnifiedNodeData;
+            return {
+                type_name: nodeData.resource.kind,
+                fields: nodeData.fieldValues || {},
+            };
+        });
 
         const transformedEdges = edges.map((edge) => {
-            const sourceIndex = nodes.findIndex((n) => n.id === edge.source)
-            const targetIndex = nodes.findIndex((n) => n.id === edge.target)
+            const sourceIndex = nodes.findIndex((n) => n.id === edge.source);
+            const targetIndex = nodes.findIndex((n) => n.id === edge.target);
             return {
                 node_a: sourceIndex,
                 node_b: targetIndex,
-            }
-        })
+            };
+        });
 
         // Update form values
         form?.setFieldsValue({
             nodes: transformedNodes,
             edges: transformedEdges,
-        })
-    }, [form])
+        });
+    }, [form]);
 
-    const isLoading = pipelineQuery?.isLoading || schematicsQuery?.isLoading
-    const isError = pipelineQuery?.isError || schematicsQuery?.isError
+    const isLoading = pipelineQuery?.isLoading || schematicsQuery?.isLoading;
+    const isError = pipelineQuery?.isError || schematicsQuery?.isError;
 
     if (isLoading) {
-        return <Spin/>
+        return <Spin />;
     }
 
     if (isError) {
-        return <div>Failed to load pipeline</div>
+        return <div>Failed to load pipeline</div>;
     }
 
-    const devices = devicesResult.data || []
-    const pipeline = pipelineQuery?.data?.data!
-    const schematics = schematicsQuery?.data?.data!
+    const devices = devicesResult.data || [];
+    const pipeline = pipelineQuery?.data?.data!;
+    const schematics = schematicsQuery?.data?.data!;
 
     return (
         <Edit saveButtonProps={saveButtonProps} canDelete>
             <Form {...formProps} layout="vertical">
                 <Form.Item name="nodes" hidden>
-                    <input/>
+                    <input />
                 </Form.Item>
                 <Form.Item name="edges" hidden>
-                    <input/>
+                    <input />
                 </Form.Item>
                 <ReactFlowProvider>
                     <PipelineFlowEditor
@@ -428,5 +584,5 @@ export default function PipelineEdit() {
                 </ReactFlowProvider>
             </Form>
         </Edit>
-    )
+    );
 }

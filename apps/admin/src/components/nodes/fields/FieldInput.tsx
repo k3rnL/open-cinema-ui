@@ -1,9 +1,9 @@
 import {Input, InputNumber, Select} from 'antd';
-import {PipelineSchematicsField} from "@/pages/pipelines/edit.tsx";
+import {FieldDefinition} from "@/types/node.ts";
 import {RefObject} from "react";
 
 interface FieldInputProps {
-    field: PipelineSchematicsField;
+    field: FieldDefinition;
     value: any;
     onChange: (value: any) => void;
     inputRef: RefObject<any>;
@@ -16,11 +16,13 @@ export function FieldInput({field, value, onChange, inputRef}: FieldInputProps) 
             <Select
                 ref={inputRef}
                 size="small"
-                style={{width: '100%'}}
+                style={{width: '100%', position: 'relative', zIndex: 1}}
                 value={value}
                 onChange={onChange}
                 options={field.choices}
                 placeholder="Select..."
+                dropdownStyle={{zIndex: 9999}}
+                getPopupContainer={() => document.body}
             />
         );
     }

@@ -6,7 +6,11 @@ import {AudioDevice} from "@open-cinema/shared";
 
 const {Text} = Typography
 
-export interface BaseAudioNodeProps extends BaseNodeProps<NodeData> {
+export interface AudioNodeData extends NodeData {
+    device: AudioDevice
+}
+
+export interface BaseAudioNodeProps extends BaseNodeProps<AudioNodeData> {
     handleType: 'source' | 'target'
     handlePosition: Position
     device: AudioDevice
@@ -14,12 +18,14 @@ export interface BaseAudioNodeProps extends BaseNodeProps<NodeData> {
 
 export default function BaseAudioNode(props: BaseAudioNodeProps) {
     const {
-        device,
+        data,
         handleType,
         handlePosition,
         color,
         icon
     } = props;
+
+    const device = data.device
 
     return (
         <>

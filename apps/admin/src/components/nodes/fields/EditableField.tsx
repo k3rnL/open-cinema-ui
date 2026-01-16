@@ -1,10 +1,10 @@
 import {useRef, useEffect} from "react";
 import {Switch} from 'antd';
-import {PipelineSchematicsField} from "@/pages/pipelines/edit.tsx";
+import {FieldDefinition} from "@/types/node.ts";
 import {FieldInput} from "./FieldInput.tsx";
 
 interface EditableFieldProps {
-    field: PipelineSchematicsField;
+    field: FieldDefinition;
     isSelected: boolean;
     value: any;
     onChange: (value: any) => void;
@@ -62,6 +62,7 @@ export function EditableField({field, isSelected, value, onChange}: EditableFiel
                 color: isRelation ? '#8c8c8c' : '#d9d9d9',
                 fontSize: 13,
                 fontStyle: isRelation ? 'italic' : 'normal',
+                pointerEvents: isSelected ? 'none' : 'auto',
             }}>
                 {displayValue}
             </span>
@@ -72,6 +73,8 @@ export function EditableField({field, isSelected, value, onChange}: EditableFiel
                     position: 'absolute',
                     inset: 0,
                     width: '100%',
+                    zIndex: 10,
+                    pointerEvents: 'auto',
                 }}>
                     <FieldInput
                         field={field}

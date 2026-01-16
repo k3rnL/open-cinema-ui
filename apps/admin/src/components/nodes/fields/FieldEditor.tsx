@@ -1,11 +1,11 @@
 import {Typography} from 'antd';
-import {PipelineSchematicsField} from "@/pages/pipelines/edit.tsx";
+import {FieldDefinition} from "@/types/node.ts";
 import {EditableField} from "./EditableField.tsx";
 
 const {Text} = Typography;
 
 export interface FieldEditorProps {
-    field: PipelineSchematicsField;
+    field: FieldDefinition;
     isSelected: boolean;
     value: any;
     onChange: (value: any) => void;
