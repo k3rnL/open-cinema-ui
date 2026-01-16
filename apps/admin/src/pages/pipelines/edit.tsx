@@ -42,7 +42,7 @@ interface PipelineNode {
     id: number;
     type_name: string;
     fields: Record<string, any>;
-    dynamic_slots?: Slot[];
+    dynamic_slots_schematics?: Slot[];
 }
 
 interface PipelineEdge {
@@ -91,163 +91,197 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
                     }
                     : node
             );
-            // Trigger graph change to update form
-            setTimeout(() => onGraphChange(updatedNodes, edges), 0);
+            // Trigger graph change to update form (pass current edges via functional setter)
+            setEdges((currentEdges) => {
+                setTimeout(() => onGraphChange(updatedNodes, currentEdges), 0);
+                return currentEdges;
+            });
             return updatedNodes;
         });
-    }, [edges, onGraphChange]);
+    }, [onGraphChange, setEdges]);
 
     // Handle node save
     const handleNodeSave = useCallback(async (nodeId: string) => {
-        const node = nodes.find((n) => n.id === nodeId);
-        if (!node) return;
-
-        const nodeData = node.data as UnifiedNodeData;
-
-        try {
-            const url = nodeData.resource.isNew
-                ? `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes`
-                : `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes/${nodeData.resource.id}`;
-
-            const response = await saveNodeMutation({
-                url,
-                method: nodeData.resource.isNew ? 'post' : 'patch',
-                values: {
-                    type_name: nodeData.resource.kind,
-                    fields: nodeData.fieldValues,
-                },
-            });
-
-            const newNodeId = nodeData.resource.isNew ? `node-${response.data.id}` : nodeId;
-            const savedNodeResourceId = response.data.id || nodeData.resource.id;
-
-            // Update node with new data from backend
-            setNodes((nds) =>
-                nds.map((n) =>
-                    n.id === nodeId
-                        ? {
-                            ...n,
-                            id: newNodeId,
-                            data: {
-                                ...n.data,
-                                resource: {
-                                    ...nodeData.resource,
-                                    id: savedNodeResourceId,
-                                    isNew: false,
-                                },
-                                dynamicSlots: response.data.dynamicSlots || nodeData.dynamicSlots,
-                                isDirty: false,
-                            },
-                        }
-                        : n
-                )
-            );
-
-            // Reload node to get updated dynamic slots
-            try {
-                const reloadResponse = await reloadNodeMutation({
-                    url: `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes/${savedNodeResourceId}`,
-                    method: 'get',
-                    values: {},
-                });
-
-                setNodes((nds) =>
-                    nds.map((n) =>
-                        n.id === newNodeId
-                            ? {
-                                ...n,
-                                data: {
-                                    ...n.data,
-                                    // Update field values and dynamic slots from backend
-                                    fieldValues: reloadResponse.data.fields || n.data.fieldValues,
-                                    dynamicSlots: reloadResponse.data.dynamic_slots_schematics || n.data.dynamicSlots,
-                                },
-                            }
-                            : n
-                    )
-                );
-            } catch (reloadError) {
-                console.warn('Failed to reload node after save:', reloadError);
-                // Don't fail the save operation if reload fails
+        // Use setNodes to get current nodes state instead of closure
+        setNodes((currentNodes) => {
+            const node = currentNodes.find((n) => n.id === nodeId);
+            if (!node) {
+                message.error('Node not found');
+                return currentNodes;
             }
 
-            message.success('Node saved successfully');
-        } catch (error: any) {
-            message.error(error?.message || 'Failed to save node');
-            throw error;
-        }
-    }, [nodes, apiUrl, saveNodeMutation, reloadNodeMutation]);
+            const nodeData = node.data as UnifiedNodeData;
+
+            // Perform async save operation
+            (async () => {
+                try {
+                    const url = nodeData.resource.isNew
+                        ? `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes`
+                        : `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes/${nodeData.resource.id}`;
+
+                    const response = await saveNodeMutation({
+                        url,
+                        method: nodeData.resource.isNew ? 'post' : 'patch',
+                        values: {
+                            type_name: nodeData.resource.kind,
+                            fields: nodeData.fieldValues,
+                        },
+                    });
+
+                    const newNodeId = nodeData.resource.isNew ? `node-${response.data.id}` : nodeId;
+                    const savedNodeResourceId = response.data.id || nodeData.resource.id;
+
+                    // Update node with new data from backend
+                    setNodes((nds) =>
+                        nds.map((n) =>
+                            n.id === nodeId
+                                ? {
+                                    ...n,
+                                    id: newNodeId,
+                                    data: {
+                                        ...n.data,
+                                        resource: {
+                                            ...nodeData.resource,
+                                            id: savedNodeResourceId,
+                                            isNew: false,
+                                        },
+                                        dynamicSlots: response.data.dynamicSlots || nodeData.dynamicSlots,
+                                        isDirty: false,
+                                    },
+                                }
+                                : n
+                        )
+                    );
+
+                    // Reload node to get updated dynamic slots
+                    try {
+                        const reloadResponse = await reloadNodeMutation({
+                            url: `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes/${savedNodeResourceId}`,
+                            method: 'get',
+                            values: {},
+                        });
+
+                        setNodes((nds) =>
+                            nds.map((n) =>
+                                n.id === newNodeId
+                                    ? {
+                                        ...n,
+                                        data: {
+                                            ...n.data,
+                                            // Update field values and dynamic slots from backend
+                                            fieldValues: reloadResponse.data.fields || n.data.fieldValues,
+                                            dynamicSlots: reloadResponse.data.dynamic_slots_schematics || n.data.dynamicSlots,
+                                        },
+                                    }
+                                    : n
+                            )
+                        );
+                    } catch (reloadError) {
+                        console.warn('Failed to reload node after save:', reloadError);
+                        // Don't fail the save operation if reload fails
+                    }
+
+                    message.success('Node saved successfully');
+                } catch (error: any) {
+                    message.error(error?.message || 'Failed to save node');
+                    throw error;
+                }
+            })();
+
+            return currentNodes;
+        });
+    }, [apiUrl, saveNodeMutation, reloadNodeMutation, setNodes]);
 
     // Handle node reload
     const handleNodeReload = useCallback(async (nodeId: string) => {
-        const node = nodes.find((n) => n.id === nodeId);
-        if (!node) return;
+        // Use setNodes to get current nodes state
+        setNodes((currentNodes) => {
+            const node = currentNodes.find((n) => n.id === nodeId);
+            if (!node) {
+                message.error('Node not found');
+                return currentNodes;
+            }
 
-        const nodeData = node.data as UnifiedNodeData;
+            const nodeData = node.data as UnifiedNodeData;
 
-        try {
-            const response = await reloadNodeMutation({
-                url: `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes/${nodeData.resource.id}`,
-                method: 'get',
-                values: {},
-            });
+            // Perform async reload operation
+            (async () => {
+                try {
+                    const response = await reloadNodeMutation({
+                        url: `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes/${nodeData.resource.id}`,
+                        method: 'get',
+                        values: {},
+                    });
 
-            setNodes((nds) =>
-                nds.map((n) =>
-                    n.id === nodeId
-                        ? {
-                            ...n,
-                            data: {
-                                ...n.data,
-                                // Update field values and dynamic slots from backend
-                                fieldValues: response.data.fields || nodeData.fieldValues,
-                                dynamicSlots: response.data.dynamic_slots_schematics || nodeData.dynamicSlots,
-                            },
-                        }
-                        : n
-                )
-            );
+                    setNodes((nds) =>
+                        nds.map((n) =>
+                            n.id === nodeId
+                                ? {
+                                    ...n,
+                                    data: {
+                                        ...n.data,
+                                        // Update field values and dynamic slots from backend
+                                        fieldValues: response.data.fields || nodeData.fieldValues,
+                                        dynamicSlots: response.data.dynamic_slots_schematics || nodeData.dynamicSlots,
+                                    },
+                                }
+                                : n
+                        )
+                    );
 
-            message.success('Node reloaded successfully');
-        } catch (error: any) {
-            message.error(error?.message || 'Failed to reload node');
-            throw error;
-        }
-    }, [nodes, apiUrl, reloadNodeMutation]);
+                    message.success('Node reloaded successfully');
+                } catch (error: any) {
+                    message.error(error?.message || 'Failed to reload node');
+                    throw error;
+                }
+            })();
+
+            return currentNodes;
+        });
+    }, [apiUrl, reloadNodeMutation, setNodes]);
 
     // Handle node delete
     const handleNodeDelete = useCallback(async (nodeId: string) => {
-        const node = nodes.find((n) => n.id === nodeId);
-        if (!node) return;
+        // Use setNodes to get current nodes state
+        setNodes((currentNodes) => {
+            const node = currentNodes.find((n) => n.id === nodeId);
+            if (!node) {
+                message.error('Node not found');
+                return currentNodes;
+            }
 
-        const nodeData = node.data as UnifiedNodeData;
+            const nodeData = node.data as UnifiedNodeData;
 
-        // If it's a new node (not yet saved), just remove it from the graph
-        if (nodeData.resource.isNew) {
-            setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-            setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
-            message.success('Node removed');
-            return;
-        }
+            // If it's a new node (not yet saved), just remove it from the graph
+            if (nodeData.resource.isNew) {
+                setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+                message.success('Node removed');
+                return currentNodes.filter((n) => n.id !== nodeId);
+            }
 
-        // Otherwise, call the backend delete endpoint
-        try {
-            await deleteNodeMutation({
-                url: `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes/${nodeData.resource.id}`,
-                method: 'delete',
-                values: {},
-            });
+            // Otherwise, call the backend delete endpoint
+            (async () => {
+                try {
+                    await deleteNodeMutation({
+                        url: `${apiUrl}/pipelines/${nodeData.resource.pipelineId}/nodes/${nodeData.resource.id}`,
+                        method: 'delete',
+                        values: {},
+                    });
 
-            // Remove node and its edges from the graph
-            setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-            setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+                    // Remove node and its edges from the graph
+                    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+                    setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
 
-            message.success('Node deleted successfully');
-        } catch (error: any) {
-            message.error(error?.message || 'Failed to delete node');
-            throw error;
-        }
-    }, [nodes, apiUrl, deleteNodeMutation, setNodes, setEdges]);
+                    message.success('Node deleted successfully');
+                } catch (error: any) {
+                    message.error(error?.message || 'Failed to delete node');
+                    throw error;
+                }
+            })();
+
+            return currentNodes;
+        });
+    }, [apiUrl, deleteNodeMutation, setNodes, setEdges]);
 
     // Convert backend pipeline node to ReactFlow node with unified data structure
     const pipelineNodeToReactFlowNode = useCallback((node: PipelineNode, index: number): Node<UnifiedNodeData> => {
@@ -256,8 +290,6 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
         if (!schematic) {
             console.warn(`Schematic for ${node.type_name} not found`);
         }
-
-        console.warn(node)
 
         return {
             id: `node-${node.id}`,
@@ -274,7 +306,7 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
                 fieldDefinitions: schematic?.fields || [],
                 fieldValues: node.fields || {},
                 slotDefinitions: schematic?.slots || [],
-                dynamicSlots: node.dynamic_slots || [],
+                dynamicSlots: node.dynamic_slots_schematics || [],
                 isDirty: false,
                 isSaving: false,
                 onFieldValuesChange: handleFieldValuesChange,
@@ -306,22 +338,6 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
         setTimeout(() => applyAutoLayout(), 100);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pipeline.id, pipeline.nodes?.length]); // Only reload when pipeline ID or node count changes
-
-    // Update node callbacks when they change
-    useEffect(() => {
-        setNodes((nds) =>
-            nds.map((node) => ({
-                ...node,
-                data: {
-                    ...node.data,
-                    onFieldValuesChange: handleFieldValuesChange,
-                    onSave: handleNodeSave,
-                    onReload: handleNodeReload,
-                    onDelete: handleNodeDelete,
-                },
-            }))
-        );
-    }, [handleFieldValuesChange, handleNodeSave, handleNodeReload, handleNodeDelete]);
 
     // All nodes use GenericNode now
     const nodeTypes = useMemo(() => ({
@@ -510,7 +526,7 @@ function PipelineFlowEditor({pipeline, devices, onGraphChange, schematics}: {
 
 export default function PipelineEdit() {
     const {formProps, saveButtonProps, query: pipelineQuery, form} = useForm<Pipeline>({
-        redirect: false,
+        redirect: false
     });
 
     const apiUrl = useApiUrl();

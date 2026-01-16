@@ -8,9 +8,10 @@ interface EditableFieldProps {
     isSelected: boolean;
     value: any;
     onChange: (value: any) => void;
+    nodeKind?: string;
 }
 
-export function EditableField({field, isSelected, value, onChange}: EditableFieldProps) {
+export function EditableField({field, isSelected, value, onChange, nodeKind}: EditableFieldProps) {
     const inputRef = useRef<any>(null);
 
     useEffect(() => {
@@ -42,13 +43,13 @@ export function EditableField({field, isSelected, value, onChange}: EditableFiel
         if (field.type.includes('Integer') || field.type.includes('BigAuto') || field.type === 'IntegerField') return value ?? 'Not set';
         if (field.type.includes('Float') || field.type.includes('Decimal')) return value ?? 'Not set';
         if (field.type.includes('DateTime') || field.type.includes('Date')) return value || 'Auto';
-        if (field.type.includes('ForeignKey') || field.type.includes('OneToOne') || field.type.includes('ManyToOne')) return 'Relation';
+        if (field.is_relation) return value ? `ID: ${value}` : 'Not set';
         if (field.type === 'JSONField') return '{ ... }';
         return value || 'Not set';
     };
 
     const displayValue = getDisplayValue();
-    const isRelation = field.type.includes('ForeignKey') || field.type.includes('OneToOne') || field.type.includes('ManyToOne');
+    const isRelation = field.is_relation;
 
     return (
         <span style={{
@@ -81,6 +82,7 @@ export function EditableField({field, isSelected, value, onChange}: EditableFiel
                         value={value}
                         onChange={onChange}
                         inputRef={inputRef}
+                        nodeKind={nodeKind}
                     />
                 </span>
             )}

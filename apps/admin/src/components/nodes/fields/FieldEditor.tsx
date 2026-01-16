@@ -9,9 +9,10 @@ export interface FieldEditorProps {
     isSelected: boolean;
     value: any;
     onChange: (value: any) => void;
+    nodeKind?: string;
 }
 
-export function FieldEditor({field, isSelected, value, onChange}: FieldEditorProps) {
+export function FieldEditor({field, isSelected, value, onChange, nodeKind}: FieldEditorProps) {
     return (
         <div style={{width: '100%'}}>
             <div style={{
@@ -38,6 +39,7 @@ export function FieldEditor({field, isSelected, value, onChange}: FieldEditorPro
                         isSelected={isSelected}
                         value={value}
                         onChange={onChange}
+                        nodeKind={nodeKind}
                     />
                 </div>
             </div>

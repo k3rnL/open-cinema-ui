@@ -1,29 +1,85 @@
 import {Input, InputNumber, Select} from 'antd';
 import {FieldDefinition} from "@/types/node.ts";
-import {RefObject} from "react";
+import {RefObject, useEffect, useState} from "react";
+import {useApiUrl} from "@refinedev/core";
 
 interface FieldInputProps {
     field: FieldDefinition;
     value: any;
     onChange: (value: any) => void;
     inputRef: RefObject<any>;
+    nodeKind?: string;
 }
 
-export function FieldInput({field, value, onChange, inputRef}: FieldInputProps) {
-    // Choice fields (Select dropdown)
-    if (field.choices && field.choices.length > 0) {
-        return (
+interface RelationSelectProps {
+    field: FieldDefinition;
+    value: any;
+    onChange: (value: any) => void;
+    inputRef: RefObject<any>;
+    nodeKind: string;
+}
+
+function RelationSelect({field, value, onChange, inputRef, nodeKind}: RelationSelectProps) {
+    const apiUrl = useApiUrl();
+    const [options, setOptions] = useState<{label: string; value: number}[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchOptions = async () => {
+            setLoading(true);
+            try {
+                const response = await fetch(`${apiUrl}/pipelines/schematics/${nodeKind}/${field.name}`);
+                const data = await response.json();
+
+                // Convert data to options - prefer 'name' field, fallback to 'id'
+                const opts = data.map((item: any) => ({
+                    label: item.name || `ID: ${item.id}`,
+                    value: item.id,
+                }));
+                setOptions(opts);
+            } catch (error) {
+                console.error('Failed to fetch relation options:', error);
+                setOptions([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchOptions();
+    }, [apiUrl, nodeKind, field.name]);
+
+    return (
+        <div className="nodrag nopan" style={{width: '100%'}}>
             <Select
                 ref={inputRef}
                 size="small"
-                style={{width: '100%', position: 'relative', zIndex: 1}}
+                style={{width: '100%'}}
                 value={value}
                 onChange={onChange}
-                options={field.choices}
-                placeholder="Select..."
-                dropdownStyle={{zIndex: 9999}}
-                getPopupContainer={() => document.body}
+                options={options}
+                placeholder={loading ? "Loading..." : "Select..."}
+                loading={loading}
+                allowClear={field.nullable}
             />
+        </div>
+    );
+}
+
+export function FieldInput({field, value, onChange, inputRef, nodeKind}: FieldInputProps) {
+    // Choice fields (Select dropdown)
+    if (field.choices && field.choices.length > 0) {
+        return (
+            <div className="nodrag nopan" style={{width: '100%'}}>
+                <Select
+                    ref={inputRef}
+                    size="small"
+                    style={{width: '100%'}}
+                    value={value}
+                    onChange={onChange}
+                    options={field.choices}
+                    placeholder="Select..."
+                />
+            </div>
         );
     }
 
@@ -63,9 +119,9 @@ export function FieldInput({field, value, onChange, inputRef}: FieldInputProps) 
         return <span style={{color: '#d9d9d9', fontSize: 13}}>{value || 'Auto'}</span>;
     }
 
-    // Relation types (read-only)
-    if (field.type.includes('ForeignKey') || field.type.includes('OneToOne') || field.type.includes('ManyToOne')) {
-        return <span style={{color: '#8c8c8c', fontSize: 13, fontStyle: 'italic'}}>Relation</span>;
+    // Relation types - fetch options from API
+    if (field.is_relation && nodeKind) {
+        return <RelationSelect field={field} value={value} onChange={onChange} inputRef={inputRef} nodeKind={nodeKind} />;
     }
 
     // JSON Field

@@ -98,7 +98,6 @@ function SlotItem({slot, nodeId}: SlotItemProps) {
 }
 
 export default function GenericNode(props: GenericNodeProps) {
-    console.log('GenericNode props:', props);
     const {
         data: nodeData,
         selected = false,
@@ -145,9 +144,7 @@ export default function GenericNode(props: GenericNodeProps) {
         try {
             await nodeData.onSave(id);
             setIsDirty(false);
-            message.success('Node saved successfully');
         } catch (error) {
-            message.error('Failed to save node');
             console.error('Save error:', error);
         } finally {
             setIsSaving(false);
@@ -225,6 +222,7 @@ export default function GenericNode(props: GenericNodeProps) {
                                         isSelected={selected}
                                         value={fieldValues[field.name]}
                                         onChange={(value) => handleFieldChange(field.name, value)}
+                                        nodeKind={nodeData.resource.kind}
                                     />
                                     {index < nodeData.fieldDefinitions.length - 1 && (
                                         <Divider style={{
