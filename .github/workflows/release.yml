@@ -123,8 +123,24 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create GitHub release and upload verified assets
+      - name: Require repository release immutability before publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh api \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            "repos/$GITHUB_REPOSITORY/immutable-releases" \
+            --jq .enabled)" = true
+
+      - name: Create draft GitHub release and upload verified assets
         uses: softprops/action-gh-release@v2
         with:
+          draft: true
           body: ${{ steps.git-cliff.outputs.content }}
+          fail_on_unmatched_files: true
           files: downloaded-release/*
+
+      - name: Publish the complete immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false
