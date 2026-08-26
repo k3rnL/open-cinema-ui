@@ -79,7 +79,7 @@ export function DashboardPage() {
         <Title level={2}>Dashboard</Title>
         <Paragraph>Current appliance and audio-orchestration status.</Paragraph>
       </div>
-      {error && <Alert type="error" showIcon message="Open Cinema status is unavailable" description={error} action={<Button onClick={() => void load()}>Retry</Button>}/>
+      {error && <Alert type="error" showIcon message="Open Cinema status is unavailable" description={error} action={<Button onClick={() => void load()}>Retry</Button>}/>}
       {!state.readiness?.liveControlsAvailable && (
         <Alert
           type="warning"

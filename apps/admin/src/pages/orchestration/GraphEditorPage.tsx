@@ -569,7 +569,7 @@ export function GraphEditorPage() {
           action={<Space direction="vertical"><Button onClick={() => void resolveConflict(true)}>Keep mine and review</Button><Button onClick={() => void resolveConflict(false)}>Load server draft</Button></Space>}
         />
       )}
-      {notice && <Alert type={applyPhase === 'failed' ? 'error' : 'info'} showIcon message={notice}/>
+      {notice && <Alert type={applyPhase === 'failed' ? 'error' : 'info'} showIcon message={notice}/>}
       {applyPhase !== 'idle' && (
         <Card size="small" title="Apply progress">
           <Steps

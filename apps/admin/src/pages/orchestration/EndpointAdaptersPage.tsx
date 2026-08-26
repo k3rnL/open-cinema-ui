@@ -260,7 +260,7 @@ export function EndpointAdaptersPage() {
         </Space>
       </Space>
 
-      {error && <Alert type="error" showIcon message="Endpoint adapters could not be loaded" description={error}/>
+      {error && <Alert type="error" showIcon message="Endpoint adapters could not be loaded" description={error}/>}
 
       <Card>
         <Table

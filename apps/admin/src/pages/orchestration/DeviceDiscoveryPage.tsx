@@ -185,8 +185,8 @@ export function DeviceDiscoveryPage() {
           <Button icon={<ReloadOutlined/>} onClick={() => void load()}>Refresh Devices</Button>
         </Space>
       </Space>
-      {error && <Alert type="error" showIcon message="Device discovery failed" description={error}/>
-      {review && <Alert closable type="success" showIcon message="Binding selector review" description={<pre style={{whiteSpace: 'pre-wrap'}}>{JSON.stringify(review, null, 2)}</pre>} onClose={() => setReview(undefined)}/>
+      {error && <Alert type="error" showIcon message="Device discovery failed" description={error}/>}
+      {review && <Alert closable type="success" showIcon message="Binding selector review" description={<pre style={{whiteSpace: 'pre-wrap'}}>{JSON.stringify(review, null, 2)}</pre>} onClose={() => setReview(undefined)}/>}
 
       <Table
         rowKey="id"

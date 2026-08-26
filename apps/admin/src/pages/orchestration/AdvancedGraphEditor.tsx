@@ -626,7 +626,7 @@ export function AdvancedGraphEditor({
                 })
               }}
             />
-            {upgradeMessage && <Alert type="info" showIcon message="Compatibility preview" description={upgradeMessage}/>
+            {upgradeMessage && <Alert type="info" showIcon message="Compatibility preview" description={upgradeMessage}/>}
             <JsonDocumentEditor
               label="Edit parameter bindings"
               value={selectedSubgraphNode.subgraph.parameterBindings ?? {}}

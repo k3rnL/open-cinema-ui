@@ -111,7 +111,7 @@ export function SpeakerTestPage() {
         message="Pause other playback and lower the amplifier volume first"
         description="Each test lasts two seconds. This diagnostic mixes directly into the selected physical output and does not change the active audio graph."
       />
-      {error && <Alert type="error" showIcon message="Speaker test failed" description={error}/>
+      {error && <Alert type="error" showIcon message="Speaker test failed" description={error}/>}
 
       {outputs.length === 0 ? (
         <Alert
