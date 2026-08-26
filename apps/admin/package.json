@@ -7,10 +7,11 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "lint": "eslint src --ext ts,tsx"
+    "lint": "eslint src --ext ts,tsx",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@open-cinema/shared": "*",
+    "@open-cinema/shared": "1.0.5",
     "@refinedev/antd": "^6.0.3",
     "@refinedev/core": "^5.0.7",
     "@refinedev/kbar": "^2.0.1",
@@ -26,7 +27,7 @@
     "react-syntax-highlighter": "^15.5.13",
     "reactflow": "^11.11.4",
     "rete-render-utils": "^2.0.3",
-    "styled-components": "^6.3.1"
+    "styled-components": "^6.5.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

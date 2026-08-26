@@ -5,10 +5,13 @@ node_modules
 
 # Testing
 coverage
+playwright-report
+test-results
 
 # Production
 dist
 build
+release-dist
 
 # Misc
 .DS_Store
@@ -26,6 +29,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Editor directories and files
+.idea/
 .vscode/*
 !.vscode/extensions.json
 *.suo

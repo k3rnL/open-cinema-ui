@@ -1,238 +1,192 @@
 # Open Cinema UI
 
-Home cinema control system with two UIs: an admin panel for device management and an on-screen interface for basic cinema controls.
+Open Cinema UI is an npm-workspace repository containing two deliberately
+separate web applications:
 
-## Project Structure
+- `apps/admin` is the end-user administration console. It uses Refine and Ant
+  Design for system status, device discovery, audio adapters, desired audio
+  graphs, processor profiles, and speaker testing.
+- `apps/ui` is the independent on-box display application. It is intentionally
+  a small placeholder until the physical-screen interaction is designed; it is
+  not a second administration console.
 
+No Django admin site is part of this repository or required to use the
+management console.
+
+## Architecture
+
+```text
+apps/admin/       Refine management console, normally mounted at /admin/
+apps/ui/          On-box placeholder, normally mounted at /ui/
+packages/shared/  Typed API client and audio-orchestration contract/state layer
+contracts/        Versioned client compatibility metadata shipped with admin
+e2e/              Deterministic browser tests with mocked backend contracts
+scripts/          Version, packaging, provenance, and archive verification tools
 ```
-open-cinema-ui/
-├── apps/
-│   ├── admin/          # Admin panel (Refine + Ant Design) - Port 3000
-│   └── ui/             # On-screen cinema UI - Port 3001
-├── packages/
-│   └── shared/         # Shared API client, types, and hooks
-└── package.json        # Monorepo root
-```
 
-## Tech Stack
+The administration console authenticates through `/api/auth/*` and negotiates
+the versioned `/api/audio/v1` orchestration contract before using audio
+features. Desired, resolved, applied, and observed runtime representations stay
+separate. Processors such as CamillaDSP and the adaptive PCM decoder are graph
+nodes, while logical audio inputs and outputs are durable endpoint references.
 
-- **Vite** - Fast build tool
-- **React 18** - UI framework
-- **TypeScript** - Type safety
-- **npm workspaces** - Monorepo management
+The shared package is resolved from TypeScript source by Vite during local
+development. Its compiled output is still a required release gate and is
+produced in `packages/shared/dist`.
 
-### Admin Panel
-- **Refine** - CRUD framework
-- **Ant Design** - UI components
-- **TanStack Query** - Server state management
+## Requirements and installation
 
-### Cinema UI
-- **TanStack Query** - Server state management
-- **Zustand** - Client state management
+- Node.js 20
+- npm with lockfile v3 support
 
-## Getting Started
-
-### 1. Install Dependencies
+Use the lockfile for reproducible development and CI installs:
 
 ```bash
-npm install
+npm ci
+npm run build:shared
 ```
 
-### 2. Build Shared Package
+`npm install` is appropriate when intentionally changing dependencies; review
+and commit the resulting `package-lock.json` change.
 
-**IMPORTANT:** You must build the shared package before running the apps:
+## Environment configuration
 
-```bash
-npm run build --workspace=packages/shared
-```
-
-### 3. Configure Environment
-
-Copy the example env files and set your backend API URL:
+Both example files default to the same-origin API mount:
 
 ```bash
-# Admin panel
 cp apps/admin/.env.example apps/admin/.env
-
-# Cinema UI
 cp apps/ui/.env.example apps/ui/.env
 ```
 
-Edit the `.env` files and set:
-```
-VITE_API_URL=http://localhost:8000/api
-```
+The supported settings are:
 
-### 4. Start Development
+- `VITE_API_URL` — API prefix used by application code; default `/api`.
+- `VITE_API_PROXY_TARGET` — admin development-server proxy target for `/api`;
+  default `http://127.0.0.1:8000`.
+- `VITE_BASE_PATH` — deployment base used by a Vite build or development
+  server; defaults to `/admin/` for admin and `/ui/` for the on-box app.
 
-Run both apps:
-```bash
-npm run dev
-```
+For a same-origin appliance deployment, serve each static build at its base
+path and reverse-proxy `/api` to Open Cinema. Do not put credentials in Vite
+environment variables because `VITE_*` values are embedded in browser assets.
 
-Or run individually:
-```bash
-npm run dev:admin  # Admin panel on http://localhost:3000
-npm run dev:ui     # Cinema UI on http://localhost:3001
-```
-
-## Admin Panel Features
-
-- **Device List** (`/devices`) - Read-only table showing all devices
-- **Refresh Button** - Triggers device discovery on backend (`POST /api/devices/refresh`)
-- **Create Device** (`/devices/create`) - Simple form to add new devices
-
-## Cinema UI Features
-
-- Source selection (HDMI 1-3, Optical)
-- Volume control with slider
-- Fullscreen optimized interface
-
-## Backend API Requirements
-
-The backend must implement these endpoints:
-
-### Devices
-- `GET /api/devices` - List all devices
-- `POST /api/devices` - Create device
-  ```json
-  {
-    "name": "Living Room Amplifier",
-    "type": "amplifier" | "source" | "display" | "processor"
-  }
-  ```
-- `POST /api/devices/refresh` - Trigger device discovery/refresh
-
-### System (for Cinema UI)
-- `GET /api/system/status` - Get current system status
-- `POST /api/system/power` - Set power state
-- `POST /api/system/source` - Change video source
-- `POST /api/system/audio/volume` - Set volume
-- `POST /api/system/audio/mute` - Toggle mute
-- `PUT /api/system/audio` - Update audio settings
-- `GET /api/system/sources` - Get available sources
-
-## Development Commands
+## Development
 
 ```bash
-# Install dependencies
-npm install
-
-# Build shared package (required before first run)
-npm run build --workspace=packages/shared
-
-# Development
-npm run dev              # Run both apps
-npm run dev:admin        # Run admin panel only
-npm run dev:ui           # Run cinema UI only
-
-# Build for production
-npm run build            # Build all apps
-npm run build:admin      # Build admin panel
-npm run build:ui         # Build cinema UI
-
-# Type checking
-npm run type-check       # Check all workspaces
+npm run dev:admin  # http://localhost:3000/admin/
+npm run dev:ui     # http://localhost:3001/ui/
+npm run dev        # both development servers
 ```
 
-## Versioning & Releases
+The admin server listens on the network for appliance/LAN development and
+proxies `/api` to the configured backend target. Authentication is provided by
+Open Cinema; the test contract uses `admin` / `admin`, but production
+credentials belong to the backend deployment.
 
-### Bump Version
+## Validation
 
-Update version across all packages (root + workspaces):
+The release gate is intentionally explicit and has no advisory lint or skipped
+workspace tests:
 
 ```bash
-# Patch version (1.0.0 → 1.0.1)
-npm run version patch
-
-# Minor version (1.0.0 → 1.1.0)
-npm run version minor
-
-# Major version (1.0.0 → 2.0.0)
-npm run version major
-
-# Specific version
-npm run version 1.2.3
+npm ci
+npm run audit
+npm run version:check
+npm run build:shared
+npm run type-check
+npm run lint
+npm test
+npm run build
+npm run version:check -- --dist
+npx playwright install chromium
+npm run test:e2e:release
 ```
 
-This will:
-- Update all `package.json` files in sync
-- Create a git commit
-- Create a git tag (e.g., `v1.1.0`)
+`npm test` runs the shared contract/state tests and both applications' unit and
+component tests. `npm run test:e2e` runs the complete deterministic browser
+suite. `npm run test:e2e:release` is the bounded release subset: it proves that
+the management application boots and authenticates against its test contract,
+and that the independent on-box placeholder boots.
 
-### Create Release
+`npm run audit` fails for every reported severity. Findings must be reviewed by
+production reachability; forced major upgrades are not an accepted shortcut.
+The current triage and remediation evidence is in
+[`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md).
+
+## Production builds and deployment assets
 
 ```bash
-npm run release
+npm run build:shared
+npm run build
 ```
 
-This will:
-1. Bump versions
-2. Push commits and tags to GitHub
-3. Trigger CI/CD pipeline
+The outputs are `apps/admin/dist` and `apps/ui/dist`. Each contains
+`open-cinema-release.json` plus matching HTML version metadata. The admin build
+also contains `contracts/audio-orchestration-client-v1.json`, which records the
+API/schema contract it supports.
 
-### CI/CD Pipeline
+The release workflow publishes separate static archives:
 
-The project uses GitHub Actions for continuous integration and releases:
+- `open-cinema-admin-v<version>.tar.gz` for the end-user management console;
+- `open-cinema-ui-v<version>.tar.gz` for the on-box placeholder;
+- one portable `.provenance.json` record per archive;
+- `checksums.sha256` covering both archives and both provenance records.
 
-- **CI** (`ci.yml`) - Runs on every push/PR:
-  - Type checking
-  - Linting
-  - Build verification
+Archives contain the files to place directly at their configured web root, not
+an outer application directory. A deployment must verify the checksum before
+extracting it.
 
-- **Release** (`release.yml`) - Runs on version tags:
-  - Builds both apps
-  - Creates `.tar.gz` archives
-  - Generates SHA256 checksums
-  - Creates GitHub release with changelog
-  - Uploads artifacts
+## Workspace versioning
 
-### Commit Message Format
-
-Use conventional commits for automatic changelog generation:
+All four manifests and their lockfile entries use one explicit version. Set it
+without creating a commit, tag, push, or publication:
 
 ```bash
-feat: add mixer support to pipelines
-fix: resolve CORS issue
-docs: update README
-chore: update dependencies
+npm run version:set -- 2.0.0
+npm run version:check
 ```
 
-## Project Details
+The command updates the root, admin, on-box, and shared package versions, pins
+both internal shared-package dependencies to that version, and updates the
+lockfile. It accepts an exact SemVer value only. Review the diff and run the
+complete validation gate before committing it.
 
-### Shared Package (`packages/shared`)
+For a tag candidate, verify identity explicitly:
 
-Contains:
-- **Types** - TypeScript interfaces for Device, AudioSettings, VideoSource, etc.
-- **API Client** - HTTP client with methods for all backend endpoints
-- **React Hooks** - useDevices, useSystemStatus, useSetVolume, etc.
-
-To make changes to the shared package:
-1. Edit files in `packages/shared/src/`
-2. Rebuild: `npm run build --workspace=packages/shared`
-3. Restart the apps
-
-### Network Access
-
-Both apps are configured to expose on the network:
-- Admin panel accessible from any device on your network
-- Cinema UI designed for fullscreen browser on the cinema display
-
-## Troubleshooting
-
-### "Failed to resolve entry for package @open-cinema/shared"
-
-**Solution:** Build the shared package first:
 ```bash
-npm run build --workspace=packages/shared
+npm run version:check -- --tag v2.0.0
 ```
 
-### Import.meta.env TypeScript errors
+## Release flow
 
-The shared package doesn't use `import.meta.env` (Vite-specific). Apps should initialize the API client with their env variables if needed.
+1. Curate and review the intended source commits; exclude generated, secret,
+   editor-local, and deferred user files.
+2. Apply the exact workspace version with `version:set`, then run the complete
+   validation sequence above.
+3. Push the reviewed commit through normal branch CI and wait for all release
+   gates to pass.
+4. Create and push the matching immutable `v<version>` tag. The tag workflow
+   repeats the same gates and rejects a tag/version mismatch.
+5. The workflow builds separate admin/on-box archives, checksums, and portable
+   provenance, uploads them to an isolated job, downloads them again, and
+   verifies contents and served builds before creating the GitHub release.
+6. Download published assets into a new directory and rerun verification before
+   adding their URLs and digests to a deployment manifest.
 
-### Port already in use
+For local packaging/verification of an already validated build:
 
-Change ports in the respective `vite.config.ts` files:
-- `apps/admin/vite.config.ts` - default: 3000
-- `apps/ui/vite.config.ts` - default: 3001
+```bash
+npm run release:package -- --tag v1.0.5
+npm run version:check -- --tag v1.0.5 --dist --artifacts release-dist
+npm run release:verify -- --input release-dist --tag v1.0.5 --smoke
+```
+
+Verification checks archive paths, SHA-256 values, provenance, application
+entry points, referenced static files, admin contract metadata, version
+identity, and both applications through a temporary HTTP server. These commands
+never create or push a Git tag. Local provenance records whether the source tree
+was dirty; workflow provenance is rejected unless the tagged checkout is clean.
+
+Conventional commit messages are used for generated release notes, for example
+`feat: add endpoint adapter controls`, `fix: preserve graph apply state`, or
+`chore: harden UI release gates`.

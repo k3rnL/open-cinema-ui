@@ -3,6 +3,7 @@
   "version": "1.0.5",
   "description": "Home cinema UI - Admin panel and on-screen interface",
   "private": true,
+  "type": "module",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -14,16 +15,36 @@
     "build:admin": "npm run build --workspace=apps/admin",
     "build:ui": "npm run build --workspace=apps/ui",
     "build": "npm run build:admin && npm run build:ui",
-    "type-check": "npm run type-check --workspaces",
-    "lint": "npm run lint --workspaces",
-    "version": "npm version --workspaces --include-workspace-root",
-    "release": "npm run version && git push --follow-tags"
+    "build:shared": "npm run build --workspace=packages/shared",
+    "type-check": "npm run type-check --workspace=packages/shared && npm run type-check --workspace=apps/admin && npm run type-check --workspace=apps/ui",
+    "lint": "eslint .",
+    "test": "npm run test --workspace=packages/shared && npm run test --workspace=apps/admin && npm run test --workspace=apps/ui",
+    "test:e2e": "playwright test",
+    "test:e2e:release": "playwright test --grep @release",
+    "audit": "npm audit --audit-level=low",
+    "version:set": "node scripts/set-version.mjs",
+    "version:check": "node scripts/check-version.mjs",
+    "release:package": "node scripts/package-release.mjs",
+    "release:verify": "node scripts/verify-release-assets.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@eslint/js": "^9.39.2",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
     "@types/node": "^22.10.5",
-    "typescript": "^5.9.3"
+    "axe-core": "^4.10.3",
+    "jsdom": "^26.1.0",
+    "globals": "^16.4.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.1",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "elkjs": "^0.11.0"
+  },
+  "overrides": {
+    "path-to-regexp": "^8.3.1",
+    "prismjs": "^1.30.0"
   }
 }

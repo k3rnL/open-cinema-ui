@@ -23,7 +23,9 @@
     /* Path aliases */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@open-cinema/shared": ["../../packages/shared/src/index.ts"],
+      "@open-cinema/shared/*": ["../../packages/shared/src/*"]
     }
   },
   "include": ["src"],
