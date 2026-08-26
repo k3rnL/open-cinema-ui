@@ -165,11 +165,14 @@ npm run version:check -- --tag v2.0.0
    validation sequence above.
 3. Push the reviewed commit through normal branch CI and wait for all release
    gates to pass.
-4. Create and push the matching immutable `v<version>` tag. The tag workflow
-   repeats the same gates and rejects a tag/version mismatch.
+4. Create and push one matching `v<version>` tag. The tag workflow repeats the
+   same gates and rejects a tag/version mismatch.
 5. The workflow builds separate admin/on-box archives, checksums, and portable
    provenance, uploads them to an isolated job, downloads them again, and
-   verifies contents and served builds before creating the GitHub release.
+   verifies contents and served builds. It then requires the repository
+   immutable-release policy, creates a draft, attaches every verified asset,
+   and publishes only after the complete set is present. Publication makes the
+   release tag and assets immutable.
 6. Download published assets into a new directory and rerun verification before
    adding their URLs and digests to a deployment manifest.
 
