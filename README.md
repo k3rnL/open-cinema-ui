@@ -176,9 +176,9 @@ npm run version:check -- --tag v2.0.0
 For local packaging/verification of an already validated build:
 
 ```bash
-npm run release:package -- --tag v1.0.5
-npm run version:check -- --tag v1.0.5 --dist --artifacts release-dist
-npm run release:verify -- --input release-dist --tag v1.0.5 --smoke
+npm run release:package -- --tag v2.0.0
+npm run version:check -- --tag v2.0.0 --dist --artifacts release-dist
+npm run release:verify -- --input release-dist --tag v2.0.0 --smoke
 ```
 
 Verification checks archive paths, SHA-256 values, provenance, application

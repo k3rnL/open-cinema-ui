@@ -1,6 +1,6 @@
 {
   "name": "@open-cinema/admin",
-  "version": "1.0.5",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@open-cinema/shared": "1.0.5",
+    "@open-cinema/shared": "2.0.0",
     "@refinedev/antd": "^6.0.3",
     "@refinedev/core": "^5.0.7",
     "@refinedev/kbar": "^2.0.1",
