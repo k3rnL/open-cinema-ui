@@ -1,163 +1,120 @@
-import {Refine} from '@refinedev/core'
+import {Authenticated, Refine} from '@refinedev/core'
 import {RefineKbar, RefineKbarProvider} from '@refinedev/kbar'
 import routerProvider, {
-    NavigateToResource,
-    UnsavedChangesNotifier,
-    DocumentTitleHandler,
+  DocumentTitleHandler,
+  NavigateToResource,
+  UnsavedChangesNotifier,
 } from '@refinedev/react-router'
 import dataProvider from '@refinedev/simple-rest'
-import {BrowserRouter, Route, Routes, Outlet} from 'react-router'
-import {ConfigProvider, App as AntdApp} from 'antd'
-import {PartitionOutlined, UsbOutlined, NodeExpandOutlined, ControlOutlined, OneToOneOutlined, SoundOutlined, ApiOutlined} from '@ant-design/icons'
-import {useNotificationProvider, ThemedLayout, ErrorComponent} from '@refinedev/antd'
+import {BrowserRouter, Outlet, Route, Routes} from 'react-router'
+import {App as AntdApp, ConfigProvider} from 'antd'
+import {ApiOutlined, CloudServerOutlined, DashboardOutlined, OneToOneOutlined, SoundOutlined, UsbOutlined} from '@ant-design/icons'
+import {ErrorComponent, ThemedLayout, useNotificationProvider} from '@refinedev/antd'
 import '@refinedev/antd/dist/reset.css'
-import DeviceList from "@/pages/devices/list.tsx";
-import DeviceCreate from "@/pages/devices/create.tsx";
-import CamillaDSPPipelineList from "@/pages/camilladsp/pipelines/list.tsx";
-import CamillaDSPPipelineCreate from "@/pages/camilladsp/pipelines/create.tsx";
-import MixerList from "@/pages/camilladsp/mixers/list.tsx";
-import MixerCreate from "@/pages/camilladsp/mixers/create.tsx";
-import MixerEdit from "@/pages/camilladsp/mixers/edit.tsx";
-import {Dashboard} from "@/pages/dashboard";
-import {ColorModeContextProvider} from "./contexts/color-mode";
-import AudioBackendPreferenceList from "@/pages/preferences/list.tsx";
-import PipelineList from "@/pages/pipelines/list.tsx";
-import PipelineEdit from "@/pages/pipelines/edit.tsx";
+import {ColorModeContextProvider} from './contexts/color-mode'
+import {CamillaDSPProfilesPage} from '@/pages/orchestration/CamillaDSPProfilesPage'
+import {DashboardPage} from '@/pages/orchestration/DashboardPage'
+import {DeviceDiscoveryPage} from '@/pages/orchestration/DeviceDiscoveryPage'
+import {GraphEditorPage} from '@/pages/orchestration/GraphEditorPage'
+import {GraphListPage} from '@/pages/orchestration/GraphListPage'
+import {EndpointAdaptersPage} from '@/pages/orchestration/EndpointAdaptersPage'
+import {SpeakerTestPage} from '@/pages/orchestration/SpeakerTestPage'
+import {LoginPage} from '@/pages/LoginPage'
+import {authProvider} from './authProvider'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 function App() {
-    return (
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
-            <RefineKbarProvider>
-                <ColorModeContextProvider>
-                    <ConfigProvider>
-                        <AntdApp>
-                            <Refine
-                                dataProvider={dataProvider(API_URL)}
-                                notificationProvider={useNotificationProvider}
-                                routerProvider={routerProvider}
-                                resources={[
-                                    {
-                                        name: 'dashboard',
-                                        list: '/dashboard'
-                                    },
-                                    {
-                                        name: 'devices',
-                                        list: '/devices',
-                                        create: '/devices/create',
-                                        meta: {
-                                            icon: <UsbOutlined/>
-                                        }
-                                    },
-                                    {
-                                        name: 'pipelines',
-                                        list: '/pipelines',
-                                        create: '/pipelines/create',
-                                        edit: '/pipelines/edit/:id',
-                                        meta: {
-                                            icon: <ApiOutlined/>
-                                        }
-                                    },
-                                    {
-                                        name: 'camilladsp',
-                                        meta: {
-                                            label: 'CamillaDSP',
-                                            icon: <OneToOneOutlined/>
-                                        }
-                                    },
-                                    {
-                                        name: 'camilladsp/pipelines',
-                                        list: '/camilladsp/pipelines',
-                                        create: '/camilladsp/pipelines/create',
-                                        meta: {
-                                            label: 'Pipelines',
-                                            icon: <PartitionOutlined/>,
-                                            parent: 'camilladsp'
-                                        },
-                                    },
-                                    {
-                                        name: 'camilladsp/mixers',
-                                        list: '/camilladsp/mixers',
-                                        create: '/camilladsp/mixers/create',
-                                        edit: '/camilladsp/mixers/edit/:id',
-                                        meta: {
-                                            label: 'Mixers',
-                                            icon: <NodeExpandOutlined/>,
-                                            parent: 'camilladsp'
-                                        },
-                                    },
-                                    {
-                                        name: 'preferences',
-                                        meta: {
-                                            label: 'Preferences',
-                                            icon: <ControlOutlined/>
-                                        }
-                                    },
-                                    {
-                                        name: 'preferences/audio-backends',
-                                        list: '/preferences/audio-backends',
-                                        edit: '/preferences/audio-backends/:name',
-                                        meta: {
-                                            label: 'Audio Backends',
-                                            icon: <SoundOutlined/>,
-                                            parent: 'preferences'
-                                        }
-                                    }
-                                ]}
-                                options={{
-                                    syncWithLocation: true,
-                                    warnWhenUnsavedChanges: true,
-                                    title: {
-                                        text: 'open-cinema',
-                                        icon: <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="logo"
-                                                   style={{width: 24}}/>
-                                    }
-                                }}
-                            >
-                                <Routes>
-                                    <Route
-                                        element={
-                                            <ThemedLayout>
-                                                <Outlet/>
-                                            </ThemedLayout>
-                                        }
-                                    >
-                                        <Route index element={<NavigateToResource resource="devices"/>}/>
-                                        <Route path="/dashboard" element={<Dashboard/>}/>
-                                        <Route path="/devices">
-                                            <Route index element={<DeviceList/>}/>
-                                            <Route path="create" element={<DeviceCreate/>}/>
-                                        </Route>
-                                        <Route path="/pipelines">
-                                            <Route index element={<PipelineList/>}/>
-                                            <Route path="edit/:id" element={<PipelineEdit/>}/>
-                                        </Route>
-                                        <Route path="/camilladsp/pipelines">
-                                            <Route index element={<CamillaDSPPipelineList/>}/>
-                                            <Route path="create" element={<CamillaDSPPipelineCreate/>}/>
-                                        </Route>
-                                        <Route path="/camilladsp/mixers">
-                                            <Route index element={<MixerList/>}/>
-                                            <Route path="create" element={<MixerCreate/>}/>
-                                            <Route path="edit/:id" element={<MixerEdit/>}/>
-                                        </Route>
-                                        <Route path="/preferences/audio-backends">
-                                            <Route index element={<AudioBackendPreferenceList/>}/>
-                                        </Route>
-                                        <Route path="*" element={<ErrorComponent/>}/>
-                                    </Route>
-                                </Routes>
-                                <RefineKbar/>
-                                <UnsavedChangesNotifier/>
-                                <DocumentTitleHandler/>
-                            </Refine>
-                        </AntdApp>
-                    </ConfigProvider>
-                </ColorModeContextProvider>
-            </RefineKbarProvider>
-        </BrowserRouter>
-    )
+  return (
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <RefineKbarProvider>
+        <ColorModeContextProvider>
+          <ConfigProvider>
+            <AntdApp>
+              <Refine
+                authProvider={authProvider}
+                dataProvider={dataProvider(API_URL)}
+                notificationProvider={useNotificationProvider}
+                routerProvider={routerProvider}
+                resources={[
+                  {
+                    name: 'dashboard',
+                    list: '/dashboard',
+                    meta: {label: 'Dashboard', icon: <DashboardOutlined/>},
+                  },
+                  {
+                    name: 'devices',
+                    list: '/devices',
+                    meta: {label: 'Devices', icon: <UsbOutlined/>},
+                  },
+                  {
+                    name: 'endpoint-adapters',
+                    list: '/endpoint-adapters',
+                    meta: {label: 'Audio adapters', icon: <CloudServerOutlined/>},
+                  },
+                  {
+                    name: 'graphs',
+                    list: '/graphs',
+                    edit: '/graphs/edit/:id',
+                    meta: {label: 'Audio graphs', icon: <ApiOutlined/>},
+                  },
+                  {
+                    name: 'camilladsp-profiles',
+                    list: '/camilladsp/profiles',
+                    meta: {label: 'CamillaDSP profiles', icon: <OneToOneOutlined/>},
+                  },
+                  {
+                    name: 'speaker-test',
+                    list: '/speaker-test',
+                    meta: {label: 'Speaker test', icon: <SoundOutlined/>},
+                  },
+                ]}
+                options={{
+                  syncWithLocation: true,
+                  warnWhenUnsavedChanges: true,
+                  title: {
+                    text: 'open-cinema',
+                    icon: <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="logo" style={{width: 24}}/>,
+                  },
+                }}
+              >
+                <Routes>
+                  <Route
+                    element={(
+                      <Authenticated key="protected" redirectOnFail="/login">
+                        <ThemedLayout><Outlet/></ThemedLayout>
+                      </Authenticated>
+                    )}
+                  >
+                    <Route index element={<NavigateToResource resource="dashboard"/>}/>
+                    <Route path="/dashboard" element={<DashboardPage/>}/>
+                    <Route path="/devices" element={<DeviceDiscoveryPage/>}/>
+                    <Route path="/endpoint-adapters" element={<EndpointAdaptersPage/>}/>
+                    <Route path="/graphs" element={<GraphListPage/>}/>
+                    <Route path="/graphs/edit/:id" element={<GraphEditorPage/>}/>
+                    <Route path="/camilladsp/profiles" element={<CamillaDSPProfilesPage/>}/>
+                    <Route path="/speaker-test" element={<SpeakerTestPage/>}/>
+                    <Route path="*" element={<ErrorComponent/>}/>
+                  </Route>
+                  <Route
+                    path="/login"
+                    element={(
+                      <Authenticated key="login" fallback={<LoginPage/>}>
+                        <NavigateToResource resource="dashboard"/>
+                      </Authenticated>
+                    )}
+                  />
+                </Routes>
+                <RefineKbar/>
+                <UnsavedChangesNotifier/>
+                <DocumentTitleHandler/>
+              </Refine>
+            </AntdApp>
+          </ConfigProvider>
+        </ColorModeContextProvider>
+      </RefineKbarProvider>
+    </BrowserRouter>
+  )
 }
 
 export default App

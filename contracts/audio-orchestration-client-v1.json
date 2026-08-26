@@ -1,0 +1,24 @@
+{
+  "documentType": "open-cinema.audio-client-contract/v1",
+  "contractSet": "open-cinema-audio-orchestration",
+  "contractSetVersion": 1,
+  "client": "open-cinema-ui-admin",
+  "basePath": "/api/audio/v1",
+  "discovery": {
+    "metadata": "/schema",
+    "schemas": "/schemas",
+    "openapi": "/openapi.json",
+    "nodeTypes": "/node-types"
+  },
+  "supported": {
+    "apiVersion": 1,
+    "desiredGraphSchemaVersion": 1,
+    "resolverReplaySchemaVersion": 1,
+    "eventSchemaVersion": 1
+  },
+  "compatibility": {
+    "missingVersion": "reject",
+    "majorMismatch": "reject",
+    "unknownRequiredCapability": "reject"
+  }
+}

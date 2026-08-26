@@ -1,9 +1,5 @@
-// Types
-export * from './types'
-
 // API
 export * from './api'
 
-// Hooks
-export * from './hooks/useDevices'
-export * from './hooks/useSystem'
+// Desired/resolved/applied/runtime audio orchestration contract
+export * from './orchestration'
