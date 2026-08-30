@@ -6,9 +6,9 @@ import routerProvider, {
   UnsavedChangesNotifier,
 } from '@refinedev/react-router'
 import dataProvider from '@refinedev/simple-rest'
-import {BrowserRouter, Outlet, Route, Routes} from 'react-router'
+import {BrowserRouter, Navigate, Outlet, Route, Routes} from 'react-router'
 import {App as AntdApp, ConfigProvider} from 'antd'
-import {ApiOutlined, CloudServerOutlined, DashboardOutlined, OneToOneOutlined, SoundOutlined, UsbOutlined} from '@ant-design/icons'
+import {ApiOutlined, AppstoreAddOutlined, CloudServerOutlined, CustomerServiceOutlined, DashboardOutlined, ExperimentOutlined, OneToOneOutlined, PlusCircleOutlined, SettingOutlined, SoundOutlined, UsbOutlined} from '@ant-design/icons'
 import {ErrorComponent, ThemedLayout, useNotificationProvider} from '@refinedev/antd'
 import '@refinedev/antd/dist/reset.css'
 import {ColorModeContextProvider} from './contexts/color-mode'
@@ -18,19 +18,38 @@ import {DeviceDiscoveryPage} from '@/pages/orchestration/DeviceDiscoveryPage'
 import {GraphEditorPage} from '@/pages/orchestration/GraphEditorPage'
 import {GraphListPage} from '@/pages/orchestration/GraphListPage'
 import {EndpointAdaptersPage} from '@/pages/orchestration/EndpointAdaptersPage'
+import {ManagedResourcesPage} from '@/pages/orchestration/ManagedResourcesPage'
 import {SpeakerTestPage} from '@/pages/orchestration/SpeakerTestPage'
 import {LoginPage} from '@/pages/LoginPage'
 import {authProvider} from './authProvider'
+import {PluginRuntimeProvider, usePluginRuntime} from './plugins/PluginRuntimeContext'
+import {PluginRoutePage} from './plugins/PluginPageRenderer'
+import {PluginDetailPage, PluginsPage} from './plugins/PluginsPage'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
-function App() {
+function pluginIcon(icon?: string) {
+  if (icon === 'experiment') return <ExperimentOutlined/>
+  if (icon === 'spotify' || icon === 'audio') return <CustomerServiceOutlined/>
+  if (icon === 'plus-circle') return <PlusCircleOutlined/>
+  return <SettingOutlined/>
+}
+
+function AdminApplication() {
+  const {plugins} = usePluginRuntime()
+  const pluginResources = plugins
+    .flatMap((plugin) => plugin.descriptor.navigation.map((navigation) => ({plugin, navigation})))
+    .sort((left, right) => left.navigation.order - right.navigation.order)
+    .map(({plugin, navigation}) => ({
+      name: navigation.id,
+      list: `/plugins/${plugin.id}/${navigation.pageId}`,
+      meta: {label: navigation.label, icon: pluginIcon(navigation.icon)},
+    }))
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
-      <RefineKbarProvider>
-        <ColorModeContextProvider>
-          <ConfigProvider>
-            <AntdApp>
+    <RefineKbarProvider>
+      <ColorModeContextProvider>
+        <ConfigProvider>
+          <AntdApp>
               <Refine
                 authProvider={authProvider}
                 dataProvider={dataProvider(API_URL)}
@@ -48,9 +67,9 @@ function App() {
                     meta: {label: 'Devices', icon: <UsbOutlined/>},
                   },
                   {
-                    name: 'endpoint-adapters',
-                    list: '/endpoint-adapters',
-                    meta: {label: 'Audio adapters', icon: <CloudServerOutlined/>},
+                    name: 'managed-resources',
+                    list: '/managed-resources',
+                    meta: {label: 'Managed resources', icon: <CloudServerOutlined/>},
                   },
                   {
                     name: 'graphs',
@@ -63,6 +82,12 @@ function App() {
                     list: '/camilladsp/profiles',
                     meta: {label: 'CamillaDSP profiles', icon: <OneToOneOutlined/>},
                   },
+                  {
+                    name: 'plugins',
+                    list: '/plugins',
+                    meta: {label: 'Plugins', icon: <AppstoreAddOutlined/>},
+                  },
+                  ...pluginResources,
                   {
                     name: 'speaker-test',
                     list: '/speaker-test',
@@ -89,11 +114,16 @@ function App() {
                     <Route index element={<NavigateToResource resource="dashboard"/>}/>
                     <Route path="/dashboard" element={<DashboardPage/>}/>
                     <Route path="/devices" element={<DeviceDiscoveryPage/>}/>
-                    <Route path="/endpoint-adapters" element={<EndpointAdaptersPage/>}/>
+                    <Route path="/managed-resources" element={<ManagedResourcesPage/>}/>
+                    <Route path="/managed-resources/adapters" element={<EndpointAdaptersPage/>}/>
+                    <Route path="/endpoint-adapters" element={<Navigate to="/managed-resources/adapters" replace/>}/>
                     <Route path="/graphs" element={<GraphListPage/>}/>
                     <Route path="/graphs/edit/:id" element={<GraphEditorPage/>}/>
                     <Route path="/camilladsp/profiles" element={<CamillaDSPProfilesPage/>}/>
                     <Route path="/speaker-test" element={<SpeakerTestPage/>}/>
+                    <Route path="/plugins" element={<PluginsPage/>}/>
+                    <Route path="/plugins/manage/:pluginId" element={<PluginDetailPage/>}/>
+                    <Route path="/plugins/:pluginId/:pageId" element={<PluginRoutePage/>}/>
                     <Route path="*" element={<ErrorComponent/>}/>
                   </Route>
                   <Route
@@ -109,10 +139,19 @@ function App() {
                 <UnsavedChangesNotifier/>
                 <DocumentTitleHandler/>
               </Refine>
-            </AntdApp>
-          </ConfigProvider>
-        </ColorModeContextProvider>
-      </RefineKbarProvider>
+          </AntdApp>
+        </ConfigProvider>
+      </ColorModeContextProvider>
+    </RefineKbarProvider>
+  )
+}
+
+function App() {
+  return (
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <PluginRuntimeProvider>
+        <AdminApplication/>
+      </PluginRuntimeProvider>
     </BrowserRouter>
   )
 }

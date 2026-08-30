@@ -91,11 +91,14 @@ describe('SpeakerTestPage', () => {
   it('starts the exact labelled channel and exposes Stop accessibly', async () => {
     const {container} = render(<SpeakerTestPage/>)
     const center = await screen.findByRole('button', {name: /FC · Front center/})
+    const stop = screen.getByRole('button', {name: 'Stop speaker test'}) as HTMLButtonElement
+    expect(stop.disabled).toBe(true)
 
     fireEvent.click(center)
     await waitFor(() => expect(audioApi.startSpeakerTest).toHaveBeenCalledWith('runtime:5:node:20', 'FC'))
-    expect(await screen.findByText('Testing')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', {name: 'Stop speaker test'}))
+    expect(await screen.findByText('Testing FC on Main surround speakers')).toBeTruthy()
+    expect(screen.getByRole('button', {name: /FC · Front center/})).toBe(center)
+    fireEvent.click(stop)
     await waitFor(() => expect(audioApi.stopSpeakerTest).toHaveBeenCalledOnce())
 
     const results = await axe.run(container, {rules: {'color-contrast': {enabled: false}}})
@@ -107,7 +110,7 @@ describe('SpeakerTestPage', () => {
     render(<SpeakerTestPage/>)
 
     expect(await screen.findByText('No testable speaker output')).toBeTruthy()
-    expect(screen.getByText(/known channel map/)).toBeTruthy()
+    expect(screen.getAllByText(/known channel map/).length).toBeGreaterThan(0)
   })
 
   it('shows an actionable discovery failure', async () => {

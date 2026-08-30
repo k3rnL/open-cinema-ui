@@ -1,10 +1,11 @@
 import {useCallback, useEffect, useState} from 'react'
-import {Alert, Button, Card, Form, Input, Modal, Space, Spin, Table, Tag, Typography, message} from 'antd'
+import {Alert, Button, Card, Form, Input, Modal, Space, Table, Tag, Typography, message} from 'antd'
 import {EditOutlined, PlusOutlined, ReloadOutlined} from '@ant-design/icons'
 import type {CamillaDSPProfileDto, JsonObject} from '@open-cinema/shared'
 import {audioApi} from './client'
+import {PageHeading, SectionSkeleton, StableStatusRegion} from '@/components/admin'
 
-const {Paragraph, Text, Title} = Typography
+const {Text} = Typography
 
 interface ProfileFormValue {
   name: string
@@ -43,6 +44,7 @@ function valuesFor(profile?: CamillaDSPProfileDto): ProfileFormValue {
 
 export function CamillaDSPProfilesPage() {
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>()
   const [profiles, setProfiles] = useState<CamillaDSPProfileDto[]>([])
   const [editing, setEditing] = useState<CamillaDSPProfileDto>()
   const [open, setOpen] = useState(false)
@@ -52,8 +54,9 @@ export function CamillaDSPProfilesPage() {
     setLoading(true)
     try {
       setProfiles((await audioApi.camilladspProfiles({allVersions: true})).items)
+      setError(undefined)
     } catch (caught) {
-      message.error(caught instanceof Error ? caught.message : String(caught))
+      setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
       setLoading(false)
     }
@@ -93,30 +96,32 @@ export function CamillaDSPProfilesPage() {
     }
   }
 
-  if (loading) return <Spin fullscreen tip="Loading CamillaDSP profiles…"/>
-
   const latest = new Map<string, number>()
   profiles.forEach((profile) => latest.set(profile.profileId, Math.max(latest.get(profile.profileId) ?? 0, profile.version)))
 
   return (
     <Space direction="vertical" size="large" style={{width: '100%'}}>
-      <Space style={{width: '100%', justifyContent: 'space-between'}} align="start" wrap>
-        <div>
-          <Title level={2}>CamillaDSP profiles</Title>
-          <Paragraph>Reusable device-independent processing profiles selected by graph processor nodes.</Paragraph>
-        </div>
-        <Space>
+      <PageHeading
+        title="CamillaDSP profiles"
+        description="Reusable device-independent processing profiles selected by graph processor nodes."
+        actions={(
+          <>
           <Button type="primary" icon={<PlusOutlined/>} onClick={() => showEditor()}>Create Profile</Button>
-          <Button icon={<ReloadOutlined/>} onClick={() => void load()}>Refresh</Button>
-        </Space>
-      </Space>
+          <Button icon={<ReloadOutlined/>} loading={loading} onClick={() => void load()}>Refresh</Button>
+          </>
+        )}
+      />
+      <StableStatusRegion
+        loading={loading && profiles.length === 0}
+        status={error ? {type: 'error', message: 'CamillaDSP profiles could not be loaded', description: error, action: <Button onClick={() => void load()}>Retry</Button>} : null}
+      />
       <Alert
         type="info"
         showIcon
         message="Profiles are immutable"
         description="Editing creates the next version. Existing published graphs remain pinned until explicitly changed and applied."
       />
-      <Table
+      {loading && profiles.length === 0 ? <SectionSkeleton rows={5}/> : <Table
         rowKey="id"
         dataSource={profiles}
         columns={[
@@ -142,7 +147,7 @@ export function CamillaDSPProfilesPage() {
             </Card>
           ),
         }}
-      />
+      />}
       <Modal
         title={editing ? `Create ${editing.name} v${editing.version + 1}` : 'Create CamillaDSP profile'}
         open={open}
@@ -154,13 +159,14 @@ export function CamillaDSPProfilesPage() {
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="Profile name" rules={[{required: true}]}><Input/></Form.Item>
           <Form.Item name="description" label="Description"><Input.TextArea rows={2}/></Form.Item>
-          <Form.Item name="parameters" label="Reusable parameter definitions" rules={[{required: true}]}>
+          <Alert type="info" showIcon message="Advanced profile document" description="CamillaDSP filters, mixers, and pipelines are intentionally edited as lossless JSON because their schemas are open-ended and profile-specific." style={{marginBottom: 16}}/>
+          <Form.Item name="parameters" label="Reusable parameter definitions (JSON)" rules={[{required: true}]}>
             <Input.TextArea rows={7}/>
           </Form.Item>
-          <Form.Item name="signalContracts" label="Input and output signal contracts" rules={[{required: true}]}>
+          <Form.Item name="signalContracts" label="Input and output signal contracts (JSON)" rules={[{required: true}]}>
             <Input.TextArea rows={9}/>
           </Form.Item>
-          <Form.Item name="processing" label="Filters, mixers, channel mapping, rate, chunks, and pipeline" rules={[{required: true}]}>
+          <Form.Item name="processing" label="Filters, mixers, channel mapping, rate, chunks, and pipeline (JSON)" rules={[{required: true}]}>
             <Input.TextArea rows={14}/>
           </Form.Item>
         </Form>

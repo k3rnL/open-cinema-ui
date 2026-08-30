@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useState} from 'react'
-import {Alert, Button, Form, Input, Modal, Select, Space, Spin, Table, Tag, Typography, message} from 'antd'
+import {Button, Form, Input, Modal, Select, Space, Table, Tag, message} from 'antd'
 import {CheckCircleOutlined, EditOutlined, PlusOutlined, PoweroffOutlined, ReloadOutlined} from '@ant-design/icons'
 import {Link, useNavigate} from 'react-router'
 import {
@@ -10,8 +10,7 @@ import {
   type OrchestrationReadinessDto,
 } from '@open-cinema/shared'
 import {audioApi} from './client'
-
-const {Paragraph, Title} = Typography
+import {PageHeading, SectionSkeleton, StableStatusRegion} from '@/components/admin'
 
 function emptyDocument(graph: GraphDefinitionDto): DesiredGraphDocumentDto {
   return {
@@ -135,33 +134,46 @@ export function GraphListPage() {
     })
   }
 
-  if (loading) return <Spin fullscreen tip="Loading desired graphs…"/>
-
   const liveReason = readiness?.blockers.join(', ') || 'audio runtime unavailable'
+  const status = !loading && !readiness?.liveControlsAvailable ? {
+    type: 'warning' as const,
+    message: 'Desired audio can still be edited; live changes are paused',
+    description: liveReason,
+  } : null
+
+  const openDefinition = (definition: GraphDefinitionDto) => navigate(`/graphs/edit/${definition.id}`)
 
   return (
     <Space direction="vertical" style={{width: '100%'}} size="large">
-      <Space style={{width: '100%', justifyContent: 'space-between'}} align="start" wrap>
-        <div>
-          <Title level={2}>Audio graphs</Title>
-          <Paragraph>Desired behavior is revisioned independently of live PipeWire objects.</Paragraph>
-        </div>
-        <Space>
+      <PageHeading
+        title="Audio graphs"
+        description="Desired behavior is revisioned independently of live PipeWire objects. Select a row to open it."
+        actions={(
+          <>
           <Button type="primary" icon={<PlusOutlined/>} onClick={() => setCreateOpen(true)}>Create Graph</Button>
           <Button icon={<ReloadOutlined/>} onClick={() => void load()}>Refresh</Button>
-        </Space>
-      </Space>
-      {!readiness?.liveControlsAvailable && (
-        <Alert
-          type="warning"
-          showIcon
-          message="Desired audio can still be edited; live changes are paused"
-          description={liveReason}
-        />
-      )}
-      <Table
+          </>
+        )}
+      />
+      <StableStatusRegion status={status} loading={loading}/>
+      {loading ? <SectionSkeleton rows={5}/> : <Table
         rowKey="id"
         dataSource={definitions}
+        onRow={(definition) => ({
+          tabIndex: 0,
+          'aria-label': `Open ${definition.name}`,
+          style: {cursor: 'pointer'},
+          onClick: (event) => {
+            if ((event.target as HTMLElement).closest('button, a, input, [role="menuitem"]')) return
+            openDefinition(definition)
+          },
+          onKeyDown: (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return
+            if ((event.target as HTMLElement).closest('button, a, input, [role="menuitem"]')) return
+            event.preventDefault()
+            openDefinition(definition)
+          },
+        })}
         columns={[
           {title: 'Name', dataIndex: 'name'},
           {title: 'Kind', dataIndex: 'kind', render: (value: string) => <Tag color={value === 'subgraph' ? 'purple' : 'blue'}>{value}</Tag>},
@@ -179,7 +191,7 @@ export function GraphListPage() {
                 <Link to={`/graphs/edit/${definition.id}`} aria-label={`Edit ${definition.name}`}>
                   <Button size="small" icon={<EditOutlined/>}/>
                 </Link>
-                {definition.kind === 'graph' && published && (
+                {definition.kind === 'graph' && published && !definition.activeRevisionId && (
                   <Button
                     size="small"
                     type="primary"
@@ -207,7 +219,7 @@ export function GraphListPage() {
             },
           },
         ]}
-      />
+      />}
       <Modal title="Create desired graph" open={createOpen} onOk={() => void create()} onCancel={() => setCreateOpen(false)}>
         <Form form={form} layout="vertical" initialValues={{kind: 'graph'}}>
           <Form.Item name="name" label="Name" rules={[{required: true}]}><Input/></Form.Item>

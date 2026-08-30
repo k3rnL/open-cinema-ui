@@ -15,18 +15,29 @@ The advanced editor uses grey for desired nodes, green for the resolved path, bl
 
 ## Editing behavior
 
-A published revision is read-only. **Start draft** creates an editable revision
-without changing active audio. Editing never autosaves. **Save draft** validates
-and persists graph content and layout with `If-Match`, but does not publish,
-activate, or reconcile it. A `412` preserves the local document and offers an
-explicit rebase or server reload instead of silently overwriting either version.
+A published revision can be used as the base for editing. The first mutation
+immediately changes the local document and creates or reuses a draft in the
+background without changing active audio. Metadata, nodes, drag-stop positions,
+collapse state, configuration, edges, public ports, parameters, rules, subgraph
+bindings, and auto layout all pass through one sequenced autosave coordinator.
+It debounces writes, keeps one request in flight, queues the newest document,
+and never lets an older response reset a newer move or value.
 
-For a top-level graph, **Apply** is one visible workflow: save the draft, run
-canonical validation, publish an immutable revision, atomically activate that
-revision with its parameter and scene bindings, and follow reconciliation to a
-terminal result. If any stage fails, the previous active revision remains the
-audio authority. A reusable subgraph can be published but is never activated by
-itself.
+The compact status beside the editor title reports saved, saving, pending,
+offline, failed, or conflict state. Transient failures retain local content and
+retry with bounded backoff. A `412` pauses autosave and preserves the local
+document while offering export/review, remote reload, or rebase where
+supported. Refresh and unload warn only when local work is pending, failed,
+offline, or conflicted. The saved viewport and node layout are desired
+presentation state; runtime overlays and intermediate drag frames are not.
+
+For a top-level graph, **Apply changes** is one visible workflow: flush the
+latest autosave, run canonical validation, publish an immutable revision,
+atomically activate that revision with its parameter and scene bindings, and
+follow reconciliation to a terminal result. If any stage fails, the previous
+active revision remains the audio authority. Published inactive graphs offer
+**Apply**; the active graph offers **Deactivate** in the same primary action
+slot. A reusable subgraph can be published but is never activated by itself.
 
 The simple editor compiles ordered `WHEN / THEN / OTHERWISE` rules into the same
 desired document used by the advanced editor; its source representation lives
@@ -36,6 +47,18 @@ graphs get a readable explanation instead of a misleading editable rule form.
 The advanced editor obtains node types, ports, compatibility contracts,
 configuration schemas, availability, and plugin diagnostics from the backend
 catalogue.
+
+Nodes remain compact at every canvas zoom. Selecting one opens a stable
+page-level inspector outside the transformed canvas; selection does not add a
+toolbar or resize the node. The inspector uses Ant Design controls for
+primitives, choices, arrays, key/value mappings, selectors, and graph interface
+bindings. Conditions use named operation, live-fact, typed-value, nested-rule,
+and duration controls; endpoint groups, target signal contracts, and
+output-specific CamillaDSP profiles also have dedicated editors. Each compact
+node exposes its catalogue description from a hover/focus information control.
+There are no per-node Save/Reload buttons because every change enters autosave.
+Unsupported open-ended structures remain lossless under an explicit **Advanced
+JSON** section with parse validation and cancel semantics.
 
 Inputs and outputs represent logical endpoints. Processors are distinct graph
 elements with lifecycle and health: CamillaDSP nodes select immutable profile
@@ -62,6 +85,25 @@ nodes, typed handles, inline fields, node toolbar, controls, minimap, and
 auto-layout. Revised screens use Ant Design/Refine primitives and the existing
 graph stylesheet only. See [the recorded baseline](UI_BASELINE.md) and
 [`docs/ui-current`](ui-current/README.md) for the current review captures.
+
+The daily management flow is organized as follows:
+
+- Dashboard: overall status, current route/format, bounded live metrics,
+  component versions, master level, and guarded system controls.
+- Devices: logical physical/virtual endpoints, availability and binding
+  evidence, plus capability-aware device or input level.
+- Managed resources: adapter configuration and correlated processing runtime;
+  restart controls come exclusively from server action descriptors.
+- Audio graphs: desired routing/processing, autosave, one lifecycle action, and
+  the human-first Result / Audio path / Why / Signal / Transition explanation.
+- CamillaDSP and Speaker test: profile authoring and spatially stable channel
+  verification respectively.
+
+Initial loading preserves the page shell with Skeletons. Asynchronous status
+uses reserved regions so alerts do not push primary controls. Responsive review
+must cover desktop and narrow layouts, light and dark theme, keyboard order,
+focus visibility, menus at multiple graph zoom levels, and button bounding
+boxes before/during/after long-running actions.
 
 ## Compatibility and local development
 

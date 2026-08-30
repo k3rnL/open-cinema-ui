@@ -195,7 +195,7 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('published graph activation', () => {
-  it('offers Apply alongside Start draft and activates without creating a draft', async () => {
+  it('offers one Apply action and activates without creating a draft', async () => {
     render(
       <MemoryRouter initialEntries={['/graphs/edit/graph-1']}>
         <Routes>
@@ -204,7 +204,8 @@ describe('published graph activation', () => {
       </MemoryRouter>,
     )
 
-    expect(await screen.findByRole('button', {name: 'Start draft'})).toBeTruthy()
+    expect(await screen.findByRole('button', {name: /Apply$/})).toBeTruthy()
+    expect(screen.queryByRole('button', {name: 'Start draft'})).toBeNull()
     fireEvent.click(screen.getByRole('button', {name: /Apply$/}))
 
     await waitFor(() => expect(api.activateRevision).toHaveBeenCalledWith(
@@ -217,7 +218,7 @@ describe('published graph activation', () => {
     expect(await screen.findByText('Activate published revision')).toBeTruthy()
   })
 
-  it('keeps draft entry available while disabling Apply and Deactivate when live control is unsafe', async () => {
+  it('keeps editing available while disabling the single Deactivate action when live control is unsafe', async () => {
     api.definitions.mockResolvedValue({items: [{...graph, activeRevisionId: revision.id}]})
     api.readiness.mockResolvedValue({
       ready: false,
@@ -238,9 +239,9 @@ describe('published graph activation', () => {
       </MemoryRouter>,
     )
 
-    expect(await screen.findByText('Apply is paused; draft editing and Save remain available')).toBeTruthy()
-    expect((screen.getByRole('button', {name: /Apply$/}) as HTMLButtonElement).disabled).toBe(true)
+    expect(await screen.findByText('Apply is paused; editing and autosave remain available')).toBeTruthy()
+    expect(screen.queryByRole('button', {name: /Apply$/})).toBeNull()
     expect((screen.getByRole('button', {name: /Deactivate$/}) as HTMLButtonElement).disabled).toBe(true)
-    expect(screen.getByRole('button', {name: 'Start draft'})).toBeTruthy()
+    expect(screen.queryByRole('button', {name: 'Start draft'})).toBeNull()
   })
 })

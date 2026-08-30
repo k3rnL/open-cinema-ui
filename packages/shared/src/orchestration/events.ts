@@ -19,6 +19,10 @@ const EVENT_KINDS: OrchestrationEventKind[] = [
   'endpoint',
   'processor',
   'health',
+  'volume',
+  'managed-resource',
+  'operation',
+  'explanation',
 ]
 
 function parseSnapshot(value: unknown): SnapshotRecoveryDto {
@@ -129,11 +133,15 @@ export class OrchestrationEventSubscription {
   }
 
   private async recoverDerivedState(): Promise<void> {
-    const [plans, readiness] = await Promise.all([
+    const [plans, readiness, masterLevel, resources] = await Promise.all([
       this.api.currentPlans(),
       this.api.readiness(),
+      this.api.masterLevel(),
+      this.api.managedResources(),
     ])
     this.store.installCurrentPlans(plans.items)
     this.store.setReadiness(readiness)
+    this.store.installMasterLevel(masterLevel.value)
+    this.store.installManagedResources(resources.items)
   }
 }

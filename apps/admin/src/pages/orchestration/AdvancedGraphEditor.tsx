@@ -11,6 +11,7 @@ import {
   type Edge,
   type Node,
   type NodeChange,
+  type Viewport,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import './reactflow-custom.css'
@@ -20,8 +21,9 @@ import {
   Card,
   Dropdown,
   Empty,
-  Input,
   Modal,
+  Col,
+  Row,
   Select,
   Space,
   Tag,
@@ -55,6 +57,8 @@ import type {
 import {getLayoutedNodes} from '@/hooks/useLayoutNodes'
 import {createClientId} from './clientId'
 import {GraphNodeCard, type GraphNodeData} from './GraphNodeCard'
+import {GraphNodeInspector} from './GraphNodeInspector'
+import {GraphInterfaceEditor, KeyValueBindings} from './GraphInterfaceEditor'
 
 const {Text, Title} = Typography
 const nodeTypes = {orchestration: GraphNodeCard}
@@ -125,6 +129,16 @@ function defaultConfiguration(
     const endpoint = endpoints[0]
     return {logicalEndpointId: endpoint?.id ?? '', direction: endpoint?.direction ?? 'output'}
   }
+  if (definition.id === 'core.conditional-bypass') {
+    const endpoint = endpoints[0]
+    return {
+      condition: {
+        op: 'exists',
+        fact: endpoint ? `endpoint.${endpoint.id}.availability` : '',
+      },
+      unknownResult: 'bypass',
+    }
+  }
   return configuration
 }
 
@@ -149,43 +163,6 @@ function runtimeForNode(node: GraphNodeDto, runtime: RuntimeProjectionDto[]) {
   })
 }
 
-function JsonDocumentEditor({
-  label,
-  value,
-  onChange,
-}: {
-  label: string
-  value: JsonValue
-  onChange: (value: JsonValue) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [text, setText] = useState(JSON.stringify(value, null, 2))
-  const [error, setError] = useState<string>()
-  useEffect(() => setText(JSON.stringify(value, null, 2)), [value])
-  return (
-    <>
-      <Button onClick={() => setOpen(true)}>{label}</Button>
-      <Modal
-        title={label}
-        open={open}
-        onCancel={() => setOpen(false)}
-        onOk={() => {
-          try {
-            onChange(JSON.parse(text) as JsonValue)
-            setError(undefined)
-            setOpen(false)
-          } catch (caught) {
-            setError(caught instanceof Error ? caught.message : String(caught))
-          }
-        }}
-      >
-        <Input.TextArea rows={14} value={text} status={error ? 'error' : undefined} onChange={(event) => setText(event.target.value)}/>
-        {error && <Text type="danger">{error}</Text>}
-      </Modal>
-    </>
-  )
-}
-
 export interface AdvancedGraphEditorProps {
   value: DesiredGraphDocumentDto
   savedValue: DesiredGraphDocumentDto
@@ -200,7 +177,6 @@ export interface AdvancedGraphEditorProps {
   onChange: (value: DesiredGraphDocumentDto) => void
   onCreateSubgraph: () => Promise<void>
   onPreviewUpgrade: (currentRevisionId: string, targetRevisionId: string) => Promise<string>
-  onSaveDraft: () => Promise<unknown>
 }
 
 export function AdvancedGraphEditor({
@@ -217,7 +193,6 @@ export function AdvancedGraphEditor({
   onChange,
   onCreateSubgraph,
   onPreviewUpgrade,
-  onSaveDraft,
 }: AdvancedGraphEditorProps) {
   const {token} = theme.useToken()
   const [selectedNodeId, setSelectedNodeId] = useState<string>()
@@ -249,23 +224,6 @@ export function AdvancedGraphEditor({
       edges: value.edges.filter((edge) => edge.from.node !== nodeId && edge.to.node !== nodeId),
     })
   }
-  const resetNode = (nodeId: string) => {
-    const saved = savedNodes.get(nodeId)
-    if (saved) updateNode(saved)
-  }
-  const toggleCollapsed = (nodeId: string) => {
-    const node = value.nodes.find((item) => item.id === nodeId)
-    if (!node) return
-    updateNode({
-      ...node,
-      layout: {
-        x: node.layout?.x ?? 0,
-        y: node.layout?.y ?? 0,
-        collapsed: !node.layout?.collapsed,
-      },
-    })
-  }
-
   const buildNodes = (): Array<Node<GraphNodeData>> => value.nodes.map((node, index) => {
     const definition = definitions.get(`${node.type}:${node.version}`)
     const desiredEndpoint = String(node.configuration.logicalEndpointId ?? '')
@@ -277,19 +235,12 @@ export function AdvancedGraphEditor({
       data: {
         graphNode: node,
         definition,
-        endpoints,
-        profiles,
         issues: issuesByNode.get(node.id) ?? [],
         resolved: activeNodeIds.has(node.id),
         observed: runtimeEndpointIds.has(desiredEndpoint) || Boolean(runtimeForNode(node, runtime)),
         runtime: runtimeForNode(node, runtime),
         dirty: JSON.stringify(savedNodes.get(node.id)) !== JSON.stringify(node),
         editable,
-        onChange: updateNode,
-        onReset: resetNode,
-        onRemove: removeNode,
-        onToggleCollapsed: toggleCollapsed,
-        onSaveDraft,
       },
     }
   })
@@ -462,6 +413,25 @@ export function AdvancedGraphEditor({
     })
   }
 
+  const savedViewport = object(object(value.layout).viewport)
+  const defaultViewport: Viewport = {
+    x: typeof savedViewport.x === 'number' ? savedViewport.x : 0,
+    y: typeof savedViewport.y === 'number' ? savedViewport.y : 0,
+    zoom: typeof savedViewport.zoom === 'number' ? savedViewport.zoom : 1,
+  }
+  const persistViewport = (_: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+    if (!editable) return
+    const changed = Math.abs(defaultViewport.x - viewport.x) > 0.5
+      || Math.abs(defaultViewport.y - viewport.y) > 0.5
+      || Math.abs(defaultViewport.zoom - viewport.zoom) > 0.001
+    if (!changed) return
+    onChange({...value, layout: {...value.layout, viewport}})
+  }
+  const selectedNode = value.nodes.find((node) => node.id === selectedNodeId)
+  const selectedDefinition = selectedNode
+    ? definitions.get(`${selectedNode.type}:${selectedNode.version}`)
+    : undefined
+
   return (
     <section aria-labelledby="advanced-editor-title">
       <Title level={4} id="advanced-editor-title">Advanced desired graph</Title>
@@ -512,32 +482,63 @@ export function AdvancedGraphEditor({
             description={validationIssues.slice(0, 4).map((issue) => <div key={`${issue.path}:${issue.code}`}>{issue.path}: {issue.message}</div>)}
           />
         )}
-        <div style={{height: 650, background: token.colorBgContainer}}>
-          {nodes.length === 0 ? (
-            <Empty description={editable ? 'Use the toolbar to add the first graph node.' : 'This revision has no nodes.'} style={{paddingTop: 180}}/>
-          ) : (
-            <ReactFlow
-              nodes={nodes}
-              edges={flowEdges}
-              nodeTypes={nodeTypes}
-              onNodesChange={changeNodes}
-              onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-              onPaneClick={() => setSelectedNodeId(undefined)}
-              onConnect={connect}
-              isValidConnection={validConnection}
-              onEdgesDelete={(deleted) => editable && onChange({...value, edges: value.edges.filter((edge) => !deleted.some((item) => item.id === edge.id))})}
-              nodesDraggable={editable}
-              nodesConnectable={editable}
-              edgesFocusable={editable}
-              deleteKeyCode={editable ? ['Backspace', 'Delete'] : null}
-              fitView
-            >
-              <Background variant={BackgroundVariant.Dots}/>
-              <Controls/>
-              <MiniMap/>
-            </ReactFlow>
-          )}
-        </div>
+        <Row gutter={[16, 16]} style={{padding: 12}}>
+          <Col xs={24} xl={17}>
+            <div style={{height: 650, background: token.colorBgContainer}}>
+              {nodes.length === 0 ? (
+                <Empty description={editable ? 'Use the toolbar to add the first graph node.' : 'This revision has no nodes.'} style={{paddingTop: 180}}/>
+              ) : (
+                <ReactFlow
+                  key={value.id}
+                  nodes={nodes}
+                  edges={flowEdges}
+                  nodeTypes={nodeTypes}
+                  defaultViewport={defaultViewport}
+                  onMoveEnd={persistViewport}
+                  onNodesChange={changeNodes}
+                  onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+                  onPaneClick={() => setSelectedNodeId(undefined)}
+                  onConnect={connect}
+                  isValidConnection={validConnection}
+                  onNodesDelete={(deleted) => editable && onChange({
+                    ...value,
+                    nodes: value.nodes.filter((node) => !deleted.some((item) => item.id === node.id)),
+                    edges: value.edges.filter((edge) => !deleted.some((item) => item.id === edge.from.node || item.id === edge.to.node)),
+                  })}
+                  onEdgesDelete={(deleted) => editable && onChange({...value, edges: value.edges.filter((edge) => !deleted.some((item) => item.id === edge.id))})}
+                  nodesDraggable={editable}
+                  nodesConnectable={editable}
+                  edgesFocusable={editable}
+                  deleteKeyCode={editable ? ['Backspace', 'Delete'] : null}
+                >
+                  <Background variant={BackgroundVariant.Dots}/>
+                  <Controls/>
+                  <MiniMap/>
+                </ReactFlow>
+              )}
+            </div>
+          </Col>
+          <Col xs={24} xl={7}>
+            <div style={{maxHeight: 650, overflowY: 'auto'}}>
+              <GraphNodeInspector
+                node={selectedNode}
+                definition={selectedDefinition}
+                endpoints={endpoints}
+                profiles={profiles}
+                nodes={value.nodes}
+                definitions={catalogue}
+                parameters={value.parameters}
+                issues={selectedNode ? issuesByNode.get(selectedNode.id) ?? [] : []}
+                editable={editable}
+                onChange={updateNode}
+                onRemove={(nodeId) => {
+                  removeNode(nodeId)
+                  setSelectedNodeId(undefined)
+                }}
+              />
+            </div>
+          </Col>
+        </Row>
         <Space wrap style={{padding: 12}} aria-label="Graph representation legend">
           <Tag>Desired graph</Tag>
           <Tag color="green">Resolved selection</Tag>
@@ -548,20 +549,7 @@ export function AdvancedGraphEditor({
       </Card>
 
       {value.kind === 'subgraph' && (
-        <Card size="small" title="Reusable public interface" style={{marginTop: 16}}>
-          <Space wrap>
-            <JsonDocumentEditor
-              label="Edit public parameters"
-              value={value.parameters as unknown as JsonValue}
-              onChange={(parameters) => editable && onChange({...value, parameters: parameters as unknown as DesiredGraphDocumentDto['parameters']})}
-            />
-            <JsonDocumentEditor
-              label="Edit public ports"
-              value={value.publicPorts as unknown as JsonValue}
-              onChange={(publicPorts) => editable && onChange({...value, publicPorts: publicPorts as unknown as DesiredGraphDocumentDto['publicPorts']})}
-            />
-          </Space>
-        </Card>
+        <GraphInterfaceEditor value={value} catalogue={catalogue} editable={editable} onChange={onChange}/>
       )}
 
       <Modal
@@ -627,20 +615,21 @@ export function AdvancedGraphEditor({
               }}
             />
             {upgradeMessage && <Alert type="info" showIcon message="Compatibility preview" description={upgradeMessage}/>}
-            <JsonDocumentEditor
-              label="Edit parameter bindings"
+            <Text strong>Parameter bindings</Text>
+            <KeyValueBindings
               value={selectedSubgraphNode.subgraph.parameterBindings ?? {}}
               onChange={(bindings) => updateNode({
                 ...selectedSubgraphNode,
-                subgraph: {...selectedSubgraphNode.subgraph!, parameterBindings: object(bindings)},
+                subgraph: {...selectedSubgraphNode.subgraph!, parameterBindings: bindings},
               })}
             />
-            <JsonDocumentEditor
-              label="Edit public port bindings"
+            <Text strong>Public port bindings</Text>
+            <KeyValueBindings
+              stringValues
               value={selectedSubgraphNode.subgraph.portBindings ?? {}}
               onChange={(bindings) => updateNode({
                 ...selectedSubgraphNode,
-                subgraph: {...selectedSubgraphNode.subgraph!, portBindings: object(bindings) as Record<string, string>},
+                subgraph: {...selectedSubgraphNode.subgraph!, portBindings: bindings as Record<string, string>},
               })}
             />
           </Space>

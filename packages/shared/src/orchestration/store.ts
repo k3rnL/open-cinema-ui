@@ -1,10 +1,13 @@
 import type {
   AudioApiMetadata,
   CurrentPlanDto,
+  EndpointAudioLevelDto,
   GraphActivationDto,
   GraphDefinitionDto,
   GraphRevisionDto,
   LogicalEndpointDto,
+  ManagedResourceDto,
+  MasterAudioLevelDto,
   OrchestrationEventDto,
   OrchestrationReadinessDto,
   ResolvedPlanDto,
@@ -12,6 +15,7 @@ import type {
   RuntimeSnapshotDto,
   SnapshotRecoveryDto,
 } from './types'
+import type { SystemControlOperationDto } from '../system/types'
 
 export type OrchestrationConnectionState =
   | 'idle'
@@ -46,6 +50,13 @@ export interface RuntimeClientState {
   available: boolean
 }
 
+export interface OperationalClientState {
+  masterLevel: MasterAudioLevelDto | null
+  endpointLevels: Record<string, EndpointAudioLevelDto>
+  managedResources: Record<string, ManagedResourceDto>
+  operations: Record<string, SystemControlOperationDto>
+}
+
 export interface OrchestrationClientState {
   compatibility: AudioApiMetadata | null
   connection: OrchestrationConnectionState
@@ -56,6 +67,7 @@ export interface OrchestrationClientState {
   resolved: ResolvedClientState
   applied: AppliedClientState
   runtime: RuntimeClientState
+  operational: OperationalClientState
   readiness: OrchestrationReadinessDto | null
 }
 
@@ -83,6 +95,12 @@ function initialState(): OrchestrationClientState {
       worldGeneration: null,
       worldSequence: null,
       available: false,
+    },
+    operational: {
+      masterLevel: null,
+      endpointLevels: {},
+      managedResources: {},
+      operations: {},
     },
     readiness: null,
   }
@@ -122,6 +140,49 @@ export class OrchestrationStore {
 
   setReadiness(readiness: OrchestrationReadinessDto): void {
     this.publish({ ...this.state, readiness })
+  }
+
+  installMasterLevel(masterLevel: MasterAudioLevelDto): void {
+    this.publish({
+      ...this.state,
+      operational: { ...this.state.operational, masterLevel },
+    })
+  }
+
+  installEndpointLevel(endpointLevel: EndpointAudioLevelDto): void {
+    this.publish({
+      ...this.state,
+      operational: {
+        ...this.state.operational,
+        endpointLevels: {
+          ...this.state.operational.endpointLevels,
+          [endpointLevel.endpointId]: endpointLevel,
+        },
+      },
+    })
+  }
+
+  installManagedResources(items: ManagedResourceDto[]): void {
+    this.publish({
+      ...this.state,
+      operational: {
+        ...this.state.operational,
+        managedResources: Object.fromEntries(items.map((item) => [item.id, item])),
+      },
+    })
+  }
+
+  installOperation(operation: SystemControlOperationDto): void {
+    this.publish({
+      ...this.state,
+      operational: {
+        ...this.state.operational,
+        operations: {
+          ...this.state.operational.operations,
+          [operation.id]: operation,
+        },
+      },
+    })
   }
 
   installDesired(input: {
@@ -208,8 +269,9 @@ export class OrchestrationStore {
   }
 
   applyEvent(kind: string, event: OrchestrationEventDto): void {
+    if (this.state.lastEventId !== null && event.sequence <= this.state.lastEventId) return
     let next = { ...this.state, lastEventId: event.sequence }
-    if (kind === 'plan') {
+    if (kind === 'plan' || kind === 'explanation') {
       const plan = event.payload.plan as unknown as ResolvedPlanDto | undefined
       if (plan?.id) {
         next = {
@@ -220,6 +282,48 @@ export class OrchestrationStore {
               ...next.resolved.currentPlanByDefinition,
               [plan.definitionId]: plan.id,
             },
+          },
+        }
+      }
+    }
+    if (kind === 'volume') {
+      const master = event.payload.master as unknown as MasterAudioLevelDto | undefined
+      const endpoint = event.payload.endpoint as unknown as EndpointAudioLevelDto | undefined
+      next = {
+        ...next,
+        operational: {
+          ...next.operational,
+          masterLevel: master?.scope === 'master-output' ? master : next.operational.masterLevel,
+          endpointLevels:
+            endpoint?.endpointId
+              ? { ...next.operational.endpointLevels, [endpoint.endpointId]: endpoint }
+              : next.operational.endpointLevels,
+        },
+      }
+    }
+    if (kind === 'managed-resource') {
+      const resource = event.payload.resource as unknown as ManagedResourceDto | undefined
+      if (resource?.id) {
+        next = {
+          ...next,
+          operational: {
+            ...next.operational,
+            managedResources: {
+              ...next.operational.managedResources,
+              [resource.id]: resource,
+            },
+          },
+        }
+      }
+    }
+    if (kind === 'operation') {
+      const operation = event.payload.operation as unknown as SystemControlOperationDto | undefined
+      if (operation?.id) {
+        next = {
+          ...next,
+          operational: {
+            ...next.operational,
+            operations: { ...next.operational.operations, [operation.id]: operation },
           },
         }
       }
@@ -266,6 +370,16 @@ export class OrchestrationStore {
     if (kind === 'runtime' || kind === 'endpoint' || kind === 'processor' || kind === 'health') {
       const projection = event.payload.projection as unknown as RuntimeProjectionDto | undefined
       if (projection?.type && projection.subject) {
+        const current = next.runtime.projections[projectionKey(projection)]
+        const projectionIsNewer =
+          current === undefined ||
+          projection.worldGeneration > current.worldGeneration ||
+          (projection.worldGeneration === current.worldGeneration &&
+            projection.worldSequence >= current.worldSequence)
+        if (!projectionIsNewer) {
+          this.publish(next)
+          return
+        }
         next = {
           ...next,
           runtime: {

@@ -1,0 +1,70 @@
+export const adminUxFixture = {
+  system: {
+    overview: {
+      hostname: 'open-cinema',
+      model: 'Raspberry Pi 5 Model B Rev 1.0',
+      operatingSystem: 'Debian GNU/Linux 13 (trixie)',
+      kernel: '6.12.47+rpt-rpi-2712',
+      bootId: '11111111-2222-3333-4444-555555555555',
+      uptimeSeconds: 86_400,
+      storage: {usedBytes: 17_179_869_184, totalBytes: 68_719_476_736},
+      temperatureCelsius: 46.8,
+      throttling: {supported: true, active: false, raw: '0x0'},
+      observedAt: '2026-08-28T12:00:00Z',
+    },
+    partialOverview: {
+      hostname: 'development-host',
+      model: null,
+      temperatureCelsius: null,
+      throttling: {supported: false, active: null, raw: null},
+      observedAt: '2026-08-28T12:00:00Z',
+    },
+    metric: {
+      observedAt: '2026-08-28T12:00:00Z',
+      cpuPercent: 7.5,
+      memory: {usedBytes: 2_147_483_648, totalBytes: 8_589_934_592, percent: 25},
+    },
+  },
+  components: [
+    {id: 'open-cinema', name: 'Open Cinema', version: '0.3.2', health: 'ready', actions: [{id: 'restart', available: true}]},
+    {id: 'open-cinema-orchestrator', name: 'Audio orchestrator', version: '0.3.2', health: 'ready', actions: [{id: 'restart', available: true}]},
+    {id: 'wyreplumber', name: 'WyrePlumber binding', version: '0.2.0', health: 'ready', actions: []},
+    {id: 'camilladsp', name: 'CamillaDSP', version: '4.0.0', health: 'ready', actions: []},
+    {id: 'pcm-auto-decoder', name: 'Adaptive PCM decoder', version: '0.2.0', health: 'ready', actions: []},
+  ],
+  levels: {
+    master: {level: 0.8, mute: false, updateVersion: 3},
+    writableOutput: {endpointId: 'endpoint-speakers', level: 0.5, mute: false, writable: {volume: true, mute: true}, effectiveLevel: 0.4},
+    readOnlyOutput: {endpointId: 'endpoint-hdmi', level: 1, mute: false, writable: {volume: false, mute: false}, effectiveLevel: 0.8},
+  },
+  resources: [
+    {id: 'adapter-roc-input', name: 'Mac ROC input', kind: 'roc-receiver', health: 'ready', actions: [{id: 'restart', available: true}]},
+    {id: 'processor-camilladsp-room', name: 'Living room CamillaDSP', kind: 'camilladsp', health: 'ready', actions: []},
+    {id: 'processor-decoder-tv', name: 'TV adaptive decoder', kind: 'pcm-auto-decoder', health: 'ready', actions: []},
+  ],
+  explanation: {
+    schemaVersion: 1,
+    headline: {status: 'active', title: 'TV audio is playing on Main speakers', summary: 'The headset is unavailable, so the main speakers were selected.'},
+    route: [
+      {kind: 'endpoint', name: 'TV / SPDIF', role: 'source'},
+      {kind: 'processor', name: 'Adaptive PCM decoder', role: 'decode', detail: 'Dolby Digital 5.1 → PCM 5.1'},
+      {kind: 'processor', name: 'Living room CamillaDSP', role: 'process', detail: 'Room correction · 5.1'},
+      {kind: 'endpoint', name: 'Main speakers', role: 'output'},
+    ],
+    selection: {trigger: 'Headset disconnected', winner: 'Main speakers', reason: 'First available preferred output'},
+    alternatives: [{name: 'Headset', status: 'unavailable', reason: 'Device is disconnected'}],
+    transition: {status: 'converged', durationMs: 4_200},
+  },
+  speakerOutput: {
+    runtimeKey: 'runtime:1:node:2',
+    runtimeGeneration: 1,
+    name: 'Main speakers',
+    description: 'WONDOM GAB8 · observed eight-channel output',
+    targetName: 'alsa_output.main',
+    channels: ['FL', 'FR', 'FC', 'LFE', 'RL', 'RR', 'SL', 'SR'].map((position) => ({
+      position,
+      label: ({FL: 'Front left', FR: 'Front right', FC: 'Front center', LFE: 'Subwoofer', RL: 'Rear left', RR: 'Rear right', SL: 'Side left', SR: 'Side right'} as Record<string, string>)[position],
+    })),
+    rate: 48_000,
+  },
+} as const

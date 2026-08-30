@@ -266,6 +266,165 @@ export interface RuntimeSnapshotDto {
   items: RuntimeProjectionDto[]
 }
 
+export interface AudioLevelValueDto {
+  level: number
+  muted: boolean
+}
+
+export interface MasterAudioLevelDto {
+  schemaVersion: 1
+  scope: 'master-output'
+  desired: AudioLevelValueDto
+  effective: AudioLevelValueDto
+  observed: JsonObject
+  writable: boolean
+  applying: boolean
+  degraded: Array<{ code: string; detail: string }>
+  runtimeVersion: string | null
+  updateVersion: number
+  updatedAt: string | null
+}
+
+export interface EndpointAudioLevelDto {
+  schemaVersion: 1
+  scope: 'device-level' | 'input-level'
+  endpointId: string
+  direction: 'input' | 'output'
+  availability: 'available' | 'unavailable' | 'ambiguous' | 'invalid'
+  desired: AudioLevelValueDto
+  master: (AudioLevelValueDto & { updateVersion: number }) | null
+  effective: AudioLevelValueDto
+  observed: { level: number | null; muted: boolean | null; known: boolean }
+  capabilities: {
+    volume: { readable: boolean; writable: boolean }
+    mute: { readable: boolean; writable: boolean }
+  }
+  applying: boolean
+  degraded: Array<{ code: string; detail: string }>
+  runtimeVersion: string | null
+  updateVersion: number
+  updatedAt: string | null
+}
+
+export interface ManagedResourceActionDto {
+  id: string
+  label: string
+  available: boolean
+  reason: string | null
+  method: 'POST' | null
+  href: string | null
+  updateVersion: number | null
+}
+
+export interface ManagedResourceDto {
+  schemaVersion: 1
+  id: string
+  resourceType: 'adapter' | 'processor'
+  name: string
+  kind: string
+  version: string | null
+  versionStatus: 'known' | 'unknown'
+  desired: {
+    lifecycle: string
+    enabled: boolean
+    updateVersion: number | null
+  }
+  observed: {
+    lifecycle: string
+    health: string
+    mode: string | null
+    profile: string | null
+    lastError: JsonObject
+    observedAt: string | null
+  }
+  freshness: {
+    observedAt: string | null
+    runtimeGeneration: number | null
+    stale: boolean
+  }
+  actions: ManagedResourceActionDto[]
+  correlations: Array<{
+    kind: string
+    subject: string
+    worldGeneration: number
+    worldSequence: number
+    evidence: JsonObject
+  }>
+}
+
+export interface ExplanationRouteSegmentDto {
+  kind: 'endpoint' | 'processor'
+  name: string
+  role: 'source' | 'decode' | 'process' | 'output'
+  detail: string | null
+  referenceId: string | null
+  nodeId: string
+}
+
+export interface RuntimeExplanationPresentationDto {
+  schemaVersion: 1
+  headline: {
+    status: 'active' | 'inactive' | 'waiting' | 'degraded' | 'failed'
+    title: string
+    summary: string
+  }
+  route: ExplanationRouteSegmentDto[]
+  selection: {
+    trigger: string
+    winner: string | null
+    winnerReferenceId: string | null
+    reasonCode: string
+    reason: string
+    selectorNodeId: string | null
+  }
+  alternatives: Array<{
+    name: string
+    referenceId: string
+    status: 'unavailable' | 'not-selected'
+    reasonCode: string
+    reason: string
+    technicalEvidence: string[]
+    selectorNodeId: string
+    role: 'source' | 'output'
+  }>
+  signals: {
+    input: JsonObject
+    path: Array<{
+      edgeId: string
+      fromNodeId: string
+      toNodeId: string
+      from: string | null
+      to: string | null
+      signal: JsonObject
+      changes: JsonObject
+      compatible: boolean
+    }>
+  }
+  processors: ExplanationRouteSegmentDto[]
+  overrides: Array<{
+    id: string | null
+    scopeType: string | null
+    scopeId: string | null
+    reason: string | null
+    value: JsonValue
+  }>
+  transition: {
+    status: string
+    durationMs: number | null
+    observedAt: string | null
+    message: string | null
+  }
+  errors: Array<{
+    stage: string
+    path: string
+    code: string
+    message: string
+    severity: 'warning' | 'error'
+    nextStep: string
+  }>
+  technicalReferences: JsonObject
+}
+
 export interface SpeakerTestChannelDto {
   position: string
   label: string
@@ -409,7 +568,7 @@ export interface ResolvedPlanDto {
   resolutionMode: 'live' | 'shadow'
   status: ResolvedPlanStatus
   document: JsonObject
-  explanation: JsonObject
+  explanation: { presentation?: RuntimeExplanationPresentationDto; [key: string]: unknown }
   planDigest: string
   correlationId: string
   applied: AppliedPlanStateDto
@@ -470,6 +629,10 @@ export type OrchestrationEventKind =
   | 'endpoint'
   | 'processor'
   | 'health'
+  | 'volume'
+  | 'managed-resource'
+  | 'operation'
+  | 'explanation'
 
 export interface OrchestrationEventDto {
   sequence: number

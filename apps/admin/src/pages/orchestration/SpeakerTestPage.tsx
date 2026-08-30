@@ -1,10 +1,11 @@
 import {useCallback, useEffect, useMemo, useState} from 'react'
-import {Alert, Button, Card, Select, Space, Spin, Tag, Typography, message} from 'antd'
+import {Alert, Button, Card, Flex, Select, Space, Tag, Typography, message} from 'antd'
 import {ReloadOutlined, SoundOutlined, StopOutlined} from '@ant-design/icons'
 import type {SpeakerTestOutputDto, SpeakerTestStateDto} from '@open-cinema/shared'
 import {audioApi} from './client'
+import {PageHeading, SectionSkeleton, StableStatusRegion} from '@/components/admin'
 
-const {Paragraph, Text, Title} = Typography
+const {Text} = Typography
 
 const inactiveState: SpeakerTestStateDto = {
   active: false,
@@ -30,7 +31,7 @@ export function SpeakerTestPage() {
   const [pendingChannel, setPendingChannel] = useState<string>()
   const [stopping, setStopping] = useState(false)
 
-  const load = useCallback(async (showSpinner = true) => {
+  const load = useCallback(async (showSpinner = true, preserveError = false) => {
     if (showSpinner) setLoading(true)
     try {
       const overview = await audioApi.speakerTest()
@@ -41,7 +42,7 @@ export function SpeakerTestPage() {
           ? current
           : overview.outputs[0]?.runtimeKey,
       )
-      setError(undefined)
+      if (!preserveError) setError(undefined)
     } catch (caught) {
       setError(errorMessage(caught))
     } finally {
@@ -73,7 +74,7 @@ export function SpeakerTestPage() {
       const detail = errorMessage(caught)
       setError(detail)
       message.error(detail)
-      await load(false)
+      await load(false, true)
     } finally {
       setPendingChannel(undefined)
     }
@@ -93,17 +94,33 @@ export function SpeakerTestPage() {
     }
   }
 
-  if (loading) return <Spin fullscreen tip="Loading speaker outputs…"/>
+  const testStatus = error ? {
+    type: 'error' as const,
+    message: 'Speaker test failed',
+    description: error,
+  } : outputs.length === 0 && !loading ? {
+    type: 'info' as const,
+    message: 'No testable speaker output',
+    description: 'No physical PCM output with a known channel map is currently available. Connect the output and refresh the runtime inventory.',
+  } : stopping ? {
+    type: 'info' as const,
+    message: 'Stopping the test tone…',
+  } : pendingChannel ? {
+    type: 'info' as const,
+    message: `Starting ${pendingChannel}…`,
+  } : active.active ? {
+    type: 'info' as const,
+    message: `Testing ${active.channel ?? 'channel'} on ${active.outputName ?? 'the selected output'}`,
+    description: 'The tone stops automatically after two seconds.',
+  } : null
 
   return (
     <Space direction="vertical" size="large" style={{width: '100%'}}>
-      <Space style={{width: '100%', justifyContent: 'space-between'}} align="start" wrap>
-        <div>
-          <Title level={2}>Speaker test</Title>
-          <Paragraph>Play a short test tone on one observed PipeWire channel at a time.</Paragraph>
-        </div>
-        <Button icon={<ReloadOutlined/>} onClick={() => void load()}>Refresh</Button>
-      </Space>
+      <PageHeading
+        title="Speaker test"
+        description="Play a short test tone on one observed PipeWire channel at a time."
+        actions={<Button icon={<ReloadOutlined/>} loading={loading} onClick={() => void load()}>Refresh</Button>}
+      />
 
       <Alert
         type="warning"
@@ -111,22 +128,14 @@ export function SpeakerTestPage() {
         message="Pause other playback and lower the amplifier volume first"
         description="Each test lasts two seconds. This diagnostic mixes directly into the selected physical output and does not change the active audio graph."
       />
-      {error && <Alert type="error" showIcon message="Speaker test failed" description={error}/>}
-
-      {outputs.length === 0 ? (
-        <Alert
-          type="info"
-          showIcon
-          message="No testable speaker output"
-          description="No physical PCM output with a known channel map is currently available. Connect the output and refresh the runtime inventory."
-          action={<Button onClick={() => void load()}>Refresh</Button>}
-        />
-      ) : (
-        <Card title="Physical output" extra={<Tag>{selected?.channels.length ?? 0} channels</Tag>}>
+      <Card title="Physical output" extra={<Tag>{selected?.channels.length ?? 0} channels</Tag>}>
+        {loading && outputs.length === 0 ? <SectionSkeleton rows={4}/> : (
           <Space direction="vertical" size="large" style={{width: '100%'}}>
             <Select
               aria-label="Speaker output"
               value={selectedKey}
+              disabled={outputs.length === 0}
+              placeholder="No testable output"
               onChange={setSelectedKey}
               options={outputs.map((output) => ({
                 value: output.runtimeKey,
@@ -134,30 +143,23 @@ export function SpeakerTestPage() {
               }))}
               style={{width: '100%', maxWidth: 560}}
             />
-            {selected && (
-              <Space direction="vertical" size="small">
-                <Text type="secondary">{selected.description}</Text>
-                <Text type="secondary">Observed order: {selected.channels.map((item) => item.position).join(' · ')}</Text>
-              </Space>
-            )}
-            {active.active && (
-              <Alert
-                type="info"
-                showIcon
-                message={(
-                  <Space wrap>
-                    <Text>Testing</Text>
-                    <Tag color="processing">{active.channel}</Tag>
-                    <Text>{active.outputName}</Text>
-                  </Space>
-                )}
-                action={(
-                  <Button danger aria-label="Stop speaker test" icon={<StopOutlined/>} loading={stopping} onClick={() => void stop()}>
-                    Stop
-                  </Button>
-                )}
-              />
-            )}
+            <Space direction="vertical" size="small" style={{minHeight: 44}}>
+              <Text type="secondary">{selected?.description ?? 'Connect a physical PCM output with a known channel map.'}</Text>
+              <Text type="secondary">Observed order: {selected?.channels.map((item) => item.position).join(' · ') || 'Not available'}</Text>
+            </Space>
+            <StableStatusRegion status={testStatus} minHeight={112} label="Speaker test status"/>
+            <Flex justify="flex-end">
+              <Button
+                danger
+                aria-label="Stop speaker test"
+                icon={<StopOutlined/>}
+                loading={stopping}
+                disabled={!active.active && !stopping}
+                onClick={() => void stop()}
+              >
+                Stop
+              </Button>
+            </Flex>
             <Space wrap size={[12, 12]}>
               {selected?.channels.map((channel) => {
                 const isActive = active.active && active.runtimeKey === selected.runtimeKey && active.channel === channel.position
@@ -178,8 +180,8 @@ export function SpeakerTestPage() {
               })}
             </Space>
           </Space>
-        </Card>
-      )}
+        )}
+      </Card>
     </Space>
   )
 }

@@ -2,7 +2,7 @@
 
 import {cleanup, fireEvent, render, screen, waitFor, within} from '@testing-library/react'
 import {afterEach, beforeAll, beforeEach, describe, expect, it, vi} from 'vitest'
-import {MemoryRouter} from 'react-router'
+import {MemoryRouter, useLocation} from 'react-router'
 import {GraphListPage} from './GraphListPage'
 
 const api = vi.hoisted(() => ({
@@ -18,6 +18,10 @@ const api = vi.hoisted(() => ({
 }))
 
 vi.mock('./client', () => ({audioApi: api}))
+
+function LocationPath() {
+  return <output aria-label="Current path">{useLocation().pathname}</output>
+}
 
 const activeGraph = {
   id: 'graph-1',
@@ -125,6 +129,10 @@ afterEach(cleanup)
 
 describe('graph activation actions', () => {
   it('applies the latest published revision without touching a draft', async () => {
+    api.definitions.mockResolvedValue({
+      items: [{...activeGraph, activeRevisionId: null}],
+      pagination: {limit: 50, offset: 0, total: 1, nextOffset: null},
+    })
     render(<MemoryRouter><GraphListPage/></MemoryRouter>)
 
     expect(await screen.findByText('Living room cinema')).toBeTruthy()
@@ -171,8 +179,16 @@ describe('graph activation actions', () => {
 
     expect(await screen.findByText('Desired audio can still be edited; live changes are paused')).toBeTruthy()
     expect(screen.getByText('WirePlumber runtime is unavailable')).toBeTruthy()
-    expect((screen.getByRole('button', {name: 'Apply Living room cinema'}) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', {name: 'Apply Living room cinema'})).toBeNull()
     expect((screen.getByRole('button', {name: 'Deactivate Living room cinema'}) as HTMLButtonElement).disabled).toBe(true)
     expect(screen.getByRole('link', {name: 'Edit Living room cinema'})).toBeTruthy()
+  })
+
+  it('opens the editor from a pointer or keyboard row action without hijacking buttons', async () => {
+    render(<MemoryRouter initialEntries={['/graphs']}><GraphListPage/><LocationPath/></MemoryRouter>)
+
+    const row = await screen.findByRole('row', {name: 'Open Living room cinema'})
+    fireEvent.keyDown(row, {key: 'Enter'})
+    await waitFor(() => expect(screen.getByLabelText('Current path').textContent).toBe('/graphs/edit/graph-1'))
   })
 })

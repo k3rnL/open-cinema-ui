@@ -98,7 +98,7 @@ describe('simple orchestration editor', () => {
 })
 
 describe('plan explanation', () => {
-  it('labels desired, world, applied, decisions, and errors accessibly', async () => {
+  it('keeps an older technical explanation accessible behind a clear fallback', async () => {
     const current: CurrentPlanDto = {
       definitionId: 'graph-1',
       applied: {
@@ -154,8 +154,9 @@ describe('plan explanation', () => {
     }
     const { container } = render(<PlanExplanation current={current} />)
 
-    expect(screen.getByText(/Desired v5, world 2:8, transition 7/)).toBeTruthy()
-    expect(screen.getByText('headset: unavailable')).toBeTruthy()
+    expect(screen.getByText('A human explanation is not available for this older plan')).toBeTruthy()
+    fireEvent.click(screen.getByText('Technical plan'))
+    expect(await screen.findByText(/headset/)).toBeTruthy()
     const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } })
     expect(results.violations).toEqual([])
   })

@@ -63,6 +63,9 @@ export function createAuthProvider(client: AuthSessionClient): AuthProvider {
         if (!session.authenticated) {
           return {success: false, error: loginError('Invalid credentials')}
         }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('open-cinema-session-changed'))
+        }
         return {success: true, redirectTo: '/'}
       } catch (error) {
         return {success: false, error: loginError(error)}
@@ -73,6 +76,9 @@ export function createAuthProvider(client: AuthSessionClient): AuthProvider {
         const session = await readSession()
         if (session.authenticated) {
           await client.post<SessionState>('/auth/logout', {})
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('open-cinema-session-changed'))
         }
         return {success: true, redirectTo: '/login'}
       } catch (error) {

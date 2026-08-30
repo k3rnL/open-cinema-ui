@@ -22,9 +22,32 @@ import {
   parseGraphRevision,
   parseRuntimeSnapshot,
 } from '../src/orchestration/validation'
+import {adminUxFixture} from './fixtures/adminUx'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+it('keeps admin UX fixtures aligned across system, audio, and resource states', () => {
+  expect(adminUxFixture.system.overview.temperatureCelsius).toBeGreaterThan(0)
+  expect(adminUxFixture.system.partialOverview.throttling.supported).toBe(false)
+  expect(adminUxFixture.components.map((component) => component.id)).toEqual(expect.arrayContaining([
+    'open-cinema',
+    'open-cinema-orchestrator',
+    'wyreplumber',
+    'camilladsp',
+    'pcm-auto-decoder',
+  ]))
+  expect(adminUxFixture.levels.writableOutput.writable.volume).toBe(true)
+  expect(adminUxFixture.levels.readOnlyOutput.writable.volume).toBe(false)
+  expect(adminUxFixture.resources.find((resource) => resource.kind === 'roc-receiver')?.actions).toHaveLength(1)
+  expect(adminUxFixture.resources.find((resource) => resource.kind === 'camilladsp')?.actions).toHaveLength(0)
+  expect(adminUxFixture.explanation.route.map((segment) => segment.role)).toEqual([
+    'source',
+    'decode',
+    'process',
+    'output',
+  ])
 })
 
 describe('API client browser security', () => {
@@ -377,6 +400,23 @@ describe('live event recovery', () => {
         runtime: {available: true, worldGeneration: 2, worldSequence: 8},
         processorsReady: true,
       })),
+      masterLevel: vi.fn(async () => ({
+        value: {
+          schemaVersion: 1,
+          scope: 'master-output',
+          desired: {level: 1, muted: false},
+          effective: {level: 1, muted: false},
+          observed: {},
+          writable: true,
+          applying: false,
+          degraded: [],
+          runtimeVersion: '2:8',
+          updateVersion: 1,
+          updatedAt: '2026-08-22T00:00:00Z',
+        },
+        etag: '"1"',
+      })),
+      managedResources: vi.fn(async () => ({schemaVersion: 1, items: []})),
     } as unknown as AudioOrchestrationApi
     let openedUrl = ''
     const subscription = new OrchestrationEventSubscription(api, store, (url) => {

@@ -7,6 +7,7 @@ import {
   type CamillaDSPProfileDto,
   type CurrentPlanDto,
   type DesiredGraphDocumentDto,
+  type EndpointAudioLevelDto,
   type EndpointCandidateExplanationDto,
   type GraphActivationDto,
   type GraphDefinitionDto,
@@ -16,6 +17,8 @@ import {
   type LogicalEndpointDto,
   type ManualOverrideDto,
   type ManagedAudioAdapterDto,
+  type ManagedResourceDto,
+  type MasterAudioLevelDto,
   type NodeTypeCatalogueDto,
   type OrchestrationReadinessDto,
   type Page,
@@ -30,7 +33,11 @@ import {
 import {
   UnsupportedAudioContractError,
   parseAudioApiMetadata,
+  parseEndpointAudioLevel,
   parseGraphRevision,
+  parseManagedResource,
+  parseMasterAudioLevel,
+  parseResolvedPlan,
   parseRuntimeSnapshot,
 } from './validation'
 
@@ -352,6 +359,44 @@ export class AudioOrchestrationApi {
     ).data
   }
 
+  async masterLevel(): Promise<VersionedResource<MasterAudioLevelDto>> {
+    const response = await this.response<unknown>('GET', '/levels/master')
+    return { value: parseMasterAudioLevel(response.data), etag: response.etag }
+  }
+
+  async updateMasterLevel(
+    updateVersion: number,
+    changes: Partial<Pick<MasterAudioLevelDto['desired'], 'level' | 'muted'>>,
+  ): Promise<VersionedResource<MasterAudioLevelDto>> {
+    const response = await this.response<unknown>(
+      'PATCH',
+      '/levels/master',
+      changes,
+      updateVersion,
+    )
+    return { value: parseMasterAudioLevel(response.data), etag: response.etag }
+  }
+
+  async endpointLevel(endpointId: string): Promise<VersionedResource<EndpointAudioLevelDto>> {
+    const response = await this.response<unknown>('GET', `/endpoints/${endpointId}/level`)
+    return { value: parseEndpointAudioLevel(response.data), etag: response.etag }
+  }
+
+  async updateEndpointLevel(
+    endpointId: string,
+    updateVersion: number,
+    runtimeVersion: string,
+    changes: Partial<Pick<EndpointAudioLevelDto['desired'], 'level' | 'muted'>>,
+  ): Promise<VersionedResource<EndpointAudioLevelDto>> {
+    const response = await this.response<unknown>(
+      'PATCH',
+      `/endpoints/${endpointId}/level`,
+      { ...changes, runtimeVersion },
+      updateVersion,
+    )
+    return { value: parseEndpointAudioLevel(response.data), etag: response.etag }
+  }
+
   async adapterTypes(): Promise<AudioAdapterTypeCatalogueDto> {
     return (
       await this.response<AudioAdapterTypeCatalogueDto>('GET', '/adapter-types')
@@ -439,21 +484,28 @@ export class AudioOrchestrationApi {
   }
 
   async currentPlans(graphId?: string): Promise<{ items: CurrentPlanDto[] }> {
-    return (
+    const result = (
       await this.response<{ items: CurrentPlanDto[] }>(
         'GET',
         `/plans/current${query({ graphId })}`,
       )
     ).data
+    return {
+      items: result.items.map((item) => ({
+        ...item,
+        plan: item.plan ? parseResolvedPlan(item.plan) : null,
+      })),
+    }
   }
 
   async planHistory(graphId?: string): Promise<Page<ResolvedPlanDto>> {
-    return (
+    const result = (
       await this.response<Page<ResolvedPlanDto>>(
         'GET',
         `/plans/history${query({ graphId })}`,
       )
     ).data
+    return { ...result, items: result.items.map(parseResolvedPlan) }
   }
 
   async dryRun(replayBundle: JsonObject): Promise<DryRunPlanDto> {
@@ -482,10 +534,22 @@ export class AudioOrchestrationApi {
     return (await this.response<SpeakerTestStateDto>('DELETE', '/speaker-test')).data
   }
 
-  async managedResources(): Promise<{ items: RuntimeProjectionDto[] }> {
-    return (
-      await this.response<{ items: RuntimeProjectionDto[] }>('GET', '/runtime/resources')
+  async managedResources(): Promise<{ schemaVersion: 1; items: ManagedResourceDto[] }> {
+    const result = (
+      await this.response<{ schemaVersion: unknown; items?: unknown[] }>(
+        'GET',
+        '/runtime/resources',
+      )
     ).data
+    if (result.schemaVersion !== 1) {
+      throw new UnsupportedAudioContractError(
+        `Unsupported managed resource collection schema ${String(result.schemaVersion)}`,
+        AUDIO_API_VERSION,
+        result.schemaVersion,
+      )
+    }
+    if (!Array.isArray(result.items)) throw new Error('managed resource collection is invalid')
+    return { schemaVersion: 1, items: result.items.map(parseManagedResource) }
   }
 
   async processors(): Promise<{ items: RuntimeProjectionDto[] }> {

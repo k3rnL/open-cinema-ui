@@ -1,0 +1,31 @@
+{
+  "speaker-test-inactive": {
+    "selector": {
+      "visible": false
+    },
+    "firstChannel": {
+      "visible": true,
+      "enabled": true,
+      "text": "FL · Front left",
+      "ariaPressed": "false",
+      "box": {
+        "x": 249,
+        "y": 701.140625,
+        "width": 137.515625,
+        "height": 32
+      }
+    },
+    "stop": {
+      "visible": true,
+      "enabled": false,
+      "text": "Stop",
+      "ariaPressed": null,
+      "box": {
+        "x": 1308.1875,
+        "y": 645.140625,
+        "width": 82.8125,
+        "height": 32
+      }
+    }
+  }
+}

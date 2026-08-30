@@ -11,7 +11,6 @@ import {
   Modal,
   Select,
   Space,
-  Spin,
   Switch,
   Table,
   Tag,
@@ -37,8 +36,9 @@ import type {
   ManagedAudioAdapterDto,
 } from '@open-cinema/shared'
 import {audioApi} from './client'
+import {PageHeading, SectionSkeleton, StableStatusRegion} from '@/components/admin'
 
-const {Paragraph, Text, Title} = Typography
+const {Text} = Typography
 
 interface AdapterFormValues {
   name: string
@@ -243,27 +243,27 @@ export function EndpointAdaptersPage() {
     })
   }
 
-  if (loading && adapters.length === 0) return <Spin fullscreen tip="Loading endpoint adapters…"/>
-
   return (
     <Space direction="vertical" size="large" style={{width: '100%'}}>
-      <Space style={{width: '100%', justifyContent: 'space-between'}} align="start" wrap>
-        <div>
-          <Title level={2}>Endpoint adapters</Title>
-          <Paragraph>
-            Create network and debug audio endpoints. They become available to the same logical endpoint and graph workflow as physical devices.
-          </Paragraph>
-        </div>
-        <Space>
+      <PageHeading
+        title="Adapter configuration"
+        description="Create network and debug audio endpoints. They become available to the same logical endpoint and graph workflow as physical devices."
+        actions={(
+          <>
+          <Link to="/managed-resources"><Button>Back to resources</Button></Link>
           <Button type="primary" icon={<PlusOutlined/>} onClick={openCreate}>Create adapter</Button>
           <Button icon={<ReloadOutlined/>} loading={loading} onClick={() => void load()}>Refresh</Button>
-        </Space>
-      </Space>
+          </>
+        )}
+      />
 
-      {error && <Alert type="error" showIcon message="Endpoint adapters could not be loaded" description={error}/>}
+      <StableStatusRegion
+        loading={loading && adapters.length === 0}
+        status={error ? {type: 'error', message: 'Endpoint adapters could not be loaded', description: error} : null}
+      />
 
       <Card>
-        <Table
+        {loading && adapters.length === 0 ? <SectionSkeleton rows={4}/> : <Table
           rowKey="id"
           dataSource={adapters}
           scroll={{x: 1050}}
@@ -320,7 +320,7 @@ export function EndpointAdaptersPage() {
               ),
             },
           ]}
-        />
+        />}
       </Card>
 
       <Modal

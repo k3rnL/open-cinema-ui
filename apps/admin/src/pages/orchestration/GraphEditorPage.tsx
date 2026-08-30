@@ -7,14 +7,13 @@ import {
   Flex,
   Modal,
   Space,
-  Spin,
   Steps,
   Tabs,
   Tag,
   Typography,
   message,
 } from 'antd'
-import {ArrowLeftOutlined, CheckCircleOutlined, PoweroffOutlined, ReloadOutlined, SaveOutlined} from '@ant-design/icons'
+import {ArrowLeftOutlined, CheckCircleOutlined, PoweroffOutlined, ReloadOutlined} from '@ant-design/icons'
 import {Link, useNavigate, useParams} from 'react-router'
 import {
   ApiProblemError,
@@ -35,6 +34,9 @@ import {AdvancedGraphEditor} from './AdvancedGraphEditor'
 import {PlanExplanation} from './PlanExplanation'
 import {RuleEditor} from './RuleEditor'
 import {audioApi} from './client'
+import {graphAutosaveNeedsWarning} from './graphAutosave'
+import {useGraphAutosave} from './useGraphAutosave'
+import {SectionSkeleton, StableStatusRegion} from '@/components/admin'
 
 const {Paragraph, Text, Title} = Typography
 
@@ -85,19 +87,30 @@ export function GraphEditorPage() {
   const [endpoints, setEndpoints] = useState<LogicalEndpointDto[]>([])
   const [profiles, setProfiles] = useState<CamillaDSPProfileDto[]>([])
   const [subgraphs, setSubgraphs] = useState<SubgraphState[]>([])
-  const [editing, setEditing] = useState<GraphRevisionDto>()
   const [published, setPublished] = useState<GraphRevisionDto>()
-  const [document, setDocument] = useState<DesiredGraphDocumentDto>()
-  const [savedDocument, setSavedDocument] = useState<DesiredGraphDocumentDto>()
-  const [dirty, setDirty] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [deactivating, setDeactivating] = useState(false)
   const [notice, setNotice] = useState<string>()
-  const [conflictVersion, setConflictVersion] = useState<number>()
   const [validationIssues, setValidationIssues] = useState<ValidationIssueDto[]>([])
   const [applyPhase, setApplyPhase] = useState<ApplyPhase>('idle')
   const [applyWorkflow, setApplyWorkflow] = useState<ApplyWorkflow>('draft')
   const [applyError, setApplyError] = useState<string>()
+
+  const createAutosaveDraft = useCallback(async (content: DesiredGraphDocumentDto) => {
+    if (!definition) throw new Error('The graph definition is not loaded.')
+    return (await audioApi.createRevision(definition.id, content)).value
+  }, [definition])
+  const saveAutosaveDraft = useCallback(async (
+    revisionId: string,
+    content: DesiredGraphDocumentDto,
+    updateVersion: number,
+  ) => (await audioApi.saveDraft(revisionId, content, updateVersion)).value, [])
+  const autosave = useGraphAutosave({createDraft: createAutosaveDraft, saveDraft: saveAutosaveDraft})
+  const editing = autosave.state.revision ?? undefined
+  const document = autosave.state.document ?? undefined
+  const savedDocument = autosave.state.baseDocument ?? undefined
+  const dirty = autosave.state.localSequence > autosave.state.acknowledgedSequence
+  const saving = autosave.state.status === 'saving'
+  const conflictVersion = autosave.state.conflictVersion ?? undefined
 
   const currentPlan = useMemo<CurrentPlanDto | null>(() => {
     if (!id) return null
@@ -154,14 +167,12 @@ export function GraphEditorPage() {
       setEndpoints(endpointPage.items)
       setCatalogue(typePage.items)
       setProfiles(profilePage.items)
-      setEditing(selectedRevision)
       setPublished(publishedValue)
-      setDocument(selectedDocument)
-      setSavedDocument(selectedDocument)
-      setDirty(false)
-      setConflictVersion(undefined)
+      autosave.install(selectedRevision ?? null, selectedDocument)
       setValidationIssues(selectedRevision?.validation.issues ?? [])
-      setNotice(draftValue ? 'Draft loaded. Live audio is unchanged until Apply.' : 'Published revision loaded read-only. Start a draft to edit.')
+      setNotice(draftValue
+        ? 'Draft loaded. Live audio is unchanged until Apply.'
+        : 'Published revision loaded. Your first edit will start and autosave a draft.')
       store.installDesired({definitions: definitions.items, endpoints: endpointPage.items, revisions})
       store.installCurrentPlans(plans.items)
       store.replaceRuntime(runtime)
@@ -174,7 +185,7 @@ export function GraphEditorPage() {
     } finally {
       setLoading(false)
     }
-  }, [id, store])
+  }, [autosave.install, id, store])
 
   useEffect(() => {
     void load()
@@ -185,21 +196,18 @@ export function GraphEditorPage() {
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
-      if (!dirty) return
+      if (!graphAutosaveNeedsWarning(autosave.state)) return
       event.preventDefault()
     }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [dirty])
+  }, [autosave.state])
 
   const changeDocument = (next: DesiredGraphDocumentDto) => {
-    if (editing?.state !== 'draft') {
-      setNotice('Start a draft before changing desired audio behavior.')
-      return
-    }
-    setDocument(next)
-    setDirty(true)
-    setNotice('Unsaved draft changes. Save does not alter live audio.')
+    autosave.mutate(next)
+    setNotice(editing?.state === 'draft'
+      ? 'Saving draft changes… Live audio is unchanged until Apply.'
+      : 'Creating an editable draft and saving this change… Live audio is unchanged until Apply.')
   }
 
   const changeAdvanced = (next: DesiredGraphDocumentDto) => {
@@ -209,49 +217,51 @@ export function GraphEditorPage() {
   }
 
   const saveDraft = useCallback(async (): Promise<GraphRevisionDto | null> => {
-    if (!editing || editing.state !== 'draft' || !document) return editing ?? null
-    setSaving(true)
-    try {
-      const result = await audioApi.saveDraft(editing.id, document, editing.updateVersion)
-      const saved = result.value
-      const canonicalDocument = saved.content ?? document
-      setEditing(saved)
-      setDocument(canonicalDocument)
-      setSavedDocument(canonicalDocument)
+    const saved = await autosave.flush()
+    if (saved) {
       setValidationIssues(saved.validation.issues)
-      setDirty(false)
-      setConflictVersion(undefined)
       setNotice(`Draft saved as version ${saved.updateVersion}. Published and live audio are unchanged.`)
-      message.success('Draft saved. Live audio was not changed.')
-      return saved
-    } catch (caught) {
-      if (caught instanceof ApiProblemError && caught.status === 412) {
-        setConflictVersion((caught.problem as {currentVersion?: number}).currentVersion)
-        setNotice('Another editor changed this draft. Your local edits are preserved below.')
-      } else {
-        setNotice(caught instanceof Error ? caught.message : String(caught))
-      }
-      return null
-    } finally {
-      setSaving(false)
     }
-  }, [document, editing])
+    return saved
+  }, [autosave.flush])
 
   const resolveConflict = async (keepLocal: boolean) => {
     if (!editing) return
     const latest = (await audioApi.revision(editing.id)).value
-    setEditing(latest)
-    setConflictVersion(undefined)
     if (keepLocal) {
-      setNotice(`Local edits rebased onto draft version ${latest.updateVersion}; review and Save again.`)
+      autosave.rebaseLocal(latest)
+      setNotice(`Local edits rebased onto draft version ${latest.updateVersion}; autosave is retrying.`)
       return
     }
-    const latestDocument = latest.content ?? document
-    setDocument(latestDocument)
-    setSavedDocument(latestDocument)
-    setDirty(false)
+    autosave.acceptRemote(latest)
     setValidationIssues(latest.validation.issues)
     setNotice(`Server draft version ${latest.updateVersion} loaded.`)
+  }
+
+  const exportLocal = () => {
+    if (!document) return
+    const blob = new Blob([JSON.stringify(document, null, 2)], {type: 'application/json'})
+    const href = URL.createObjectURL(blob)
+    const link = window.document.createElement('a')
+    link.href = href
+    link.download = `${definition?.name ?? 'open-cinema-graph'}-local.json`
+    link.click()
+    URL.revokeObjectURL(href)
+  }
+
+  const refresh = () => {
+    if (!graphAutosaveNeedsWarning(autosave.state)) {
+      void load()
+      return
+    }
+    Modal.confirm({
+      title: 'Load the server version?',
+      content: 'Pending local graph changes will be replaced. You can download a local copy first.',
+      okText: 'Load server version',
+      okButtonProps: {danger: true},
+      cancelText: 'Keep editing',
+      onOk: () => load(),
+    })
   }
 
   const validate = async (revision = editing, content = document) => {
@@ -260,19 +270,6 @@ export function GraphEditorPage() {
     setValidationIssues(result.issues)
     message[result.valid ? 'success' : 'warning'](result.valid ? 'Draft is valid.' : `${result.issues.length} issue(s) need attention.`)
     return result
-  }
-
-  const startDraft = async () => {
-    if (!definition || !document) return
-    const created = await audioApi.createRevision(definition.id, published?.content ?? document)
-    const next = created.value
-    const nextDocument = next.content ?? document
-    setEditing(next)
-    setDocument(nextDocument)
-    setSavedDocument(nextDocument)
-    setDirty(false)
-    setValidationIssues(next.validation.issues)
-    setNotice('Editable draft created. Active audio did not change.')
   }
 
   const discard = async () => {
@@ -320,12 +317,12 @@ export function GraphEditorPage() {
   }
 
   const apply = async () => {
-    if (!editing || editing.state !== 'draft' || !document || !definition) return
+    if (!editing || !document || !definition) return
     setApplyWorkflow('draft')
     setApplyError(undefined)
     setApplyPhase('saving')
     let saved = editing
-    if (dirty) {
+    if (editing.state !== 'draft' || graphAutosaveNeedsWarning(autosave.state)) {
       const result = await saveDraft()
       if (!result) {
         setApplyPhase('failed')
@@ -345,7 +342,7 @@ export function GraphEditorPage() {
       setApplyPhase('publishing')
       if (definition.kind === 'subgraph') {
         const result = await audioApi.publishRevision(saved.id, saved.updateVersion)
-        setEditing(result.value)
+        autosave.markPublished(result.value)
         setPublished(result.value)
         setApplyPhase('converged')
         setNotice('Reusable subgraph revision published. Parent graphs remain pinned to their selected version.')
@@ -360,15 +357,13 @@ export function GraphEditorPage() {
         {},
         rules.scene ? {active: rules.scene} : {},
       )
-      setEditing(result.value)
+      autosave.markPublished(result.value)
       setPublished(result.value)
       setDefinition({
         ...definition,
         activeRevisionId: result.value.id,
         desiredStateVersion: activation.value.desiredStateVersion + 1,
       })
-      setSavedDocument(result.value.content ?? saved.content ?? document)
-      setDirty(false)
       setApplyPhase('reconciling')
       setNotice('Revision published and activated atomically. Following reconciliation…')
       await followReconciliation(result.value.id)
@@ -473,7 +468,7 @@ export function GraphEditorPage() {
     message.success('Reusable subgraph draft created. Open it from Audio graphs to define and publish its interface.')
   }
 
-  if (loading) return <Spin fullscreen tip="Loading graph editor…"/>
+  if (loading) return <Space direction="vertical" size="large" style={{width: '100%'}}><SectionSkeleton rows={2}/><SectionSkeleton rows={8}/></Space>
   if (!definition || !document || !savedDocument) {
     return <Alert type="error" showIcon message="Graph editor unavailable" description={applyError}/>
   }
@@ -481,7 +476,10 @@ export function GraphEditorPage() {
     return <Alert type="error" showIcon message="Audio API compatibility error" description={liveState.connectionMessage}/>
   }
 
-  const editable = editing?.state === 'draft'
+  const editable = Boolean(editing)
+  const hasDraftWork = editing?.state === 'draft'
+    || autosave.state.localSequence > autosave.state.acknowledgedSequence
+    || ['pending', 'saving', 'offline', 'failed', 'conflict'].includes(autosave.state.status)
   const simple = selectorRulesFromDocument(document)
   const inputEndpoint = simple.inputEndpointId || endpoints.find((endpoint) => endpoint.direction === 'input')?.id || ''
   const liveReason = liveState.readiness?.blockers.join(', ') || liveState.connectionMessage || 'runtime unavailable'
@@ -489,6 +487,22 @@ export function GraphEditorPage() {
   const phaseIndex = applyWorkflow === 'published'
     ? {idle: -1, saving: 0, validating: 0, publishing: 0, reconciling: 1, converged: 2, failed: 2}[applyPhase]
     : {idle: -1, saving: 0, validating: 1, publishing: 2, reconciling: 3, converged: 4, failed: 4}[applyPhase]
+  const pageStatus = conflictVersion !== undefined ? {
+    type: 'error' as const,
+    message: `Draft conflict with server version ${conflictVersion}`,
+    description: 'Your local graph and layout are still present. Rebase and retry, download a local copy, or load the server draft.',
+    action: <Space direction="vertical"><Button onClick={() => void resolveConflict(true)}>Keep mine and retry</Button><Button onClick={exportLocal}>Download local copy</Button><Button onClick={() => void resolveConflict(false)}>Load server draft</Button></Space>,
+  } : !liveState.readiness?.liveControlsAvailable && definition.kind === 'graph' ? {
+    type: 'warning' as const,
+    message: 'Apply is paused; editing and autosave remain available',
+    description: liveReason,
+  } : liveState.recoveryRequired ? {
+    type: 'info' as const,
+    message: 'Recovering missed live events from a full snapshot',
+  } : notice ? {
+    type: applyPhase === 'failed' ? 'error' as const : 'info' as const,
+    message: notice,
+  } : null
 
   return (
     <Space direction="vertical" size="middle" style={{width: '100%'}}>
@@ -505,8 +519,27 @@ export function GraphEditorPage() {
           </div>
         </Space>
         <Space wrap>
-          <Button icon={<ReloadOutlined/>} onClick={() => void load()}>Refresh</Button>
-          {definition.kind === 'graph' && definition.activeRevisionId && (
+          <Button icon={<ReloadOutlined/>} onClick={refresh}>Refresh</Button>
+          {editing?.state === 'draft' && (
+            <>
+              <Button onClick={() => void validate()}>Validate</Button>
+              <Button disabled={!published} onClick={() => void compare()}>Compare</Button>
+              <Button danger onClick={() => void discard()}>Discard draft</Button>
+            </>
+          )}
+          {definition.kind === 'graph' && hasDraftWork && (
+              <Button
+                type="primary"
+                icon={<CheckCircleOutlined/>}
+                loading={saving}
+                disabled={conflictVersion !== undefined || !liveState.readiness?.liveControlsAvailable}
+                title={!liveState.readiness?.liveControlsAvailable ? liveReason : undefined}
+                onClick={() => void apply()}
+              >
+                Apply changes
+              </Button>
+          )}
+          {definition.kind === 'graph' && !hasDraftWork && definition.activeRevisionId && (
             <Button
               danger
               icon={<PoweroffOutlined/>}
@@ -518,58 +551,32 @@ export function GraphEditorPage() {
               Deactivate
             </Button>
           )}
-          {editing?.state === 'published' && (
-            <>
-              <Button type={definition.kind === 'subgraph' ? 'primary' : 'default'} onClick={() => void startDraft()}>Start draft</Button>
-              {definition.kind === 'graph' && (
-                <Button
-                  type="primary"
-                  icon={<CheckCircleOutlined/>}
-                  disabled={!liveState.readiness?.liveControlsAvailable}
-                  title={!liveState.readiness?.liveControlsAvailable ? liveReason : undefined}
-                  onClick={() => void applyPublished()}
-                >
-                  Apply
-                </Button>
-              )}
-            </>
+          {definition.kind === 'graph' && !hasDraftWork && !definition.activeRevisionId && editing?.state === 'published' && (
+            <Button
+              type="primary"
+              icon={<CheckCircleOutlined/>}
+              disabled={!liveState.readiness?.liveControlsAvailable}
+              title={!liveState.readiness?.liveControlsAvailable ? liveReason : undefined}
+              onClick={() => void applyPublished()}
+            >
+              Apply
+            </Button>
           )}
-          {editable && (
-            <>
-              <Button loading={saving} disabled={conflictVersion !== undefined} icon={<SaveOutlined/>} onClick={() => void saveDraft()}>
-                Save draft
-              </Button>
-              <Button onClick={() => void validate()}>Validate</Button>
-              <Button disabled={!published} onClick={() => void compare()}>Compare</Button>
-              <Button danger onClick={() => void discard()}>Discard draft</Button>
-              <Button
-                type="primary"
-                icon={<CheckCircleOutlined/>}
-                disabled={conflictVersion !== undefined || (definition.kind === 'graph' && !liveState.readiness?.liveControlsAvailable)}
-                title={definition.kind === 'graph' && !liveState.readiness?.liveControlsAvailable ? liveReason : undefined}
-                onClick={() => void apply()}
-              >
-                {definition.kind === 'graph' ? 'Apply' : 'Publish subgraph'}
-              </Button>
-            </>
+          {definition.kind === 'subgraph' && hasDraftWork && (
+            <Button
+              type="primary"
+              icon={<CheckCircleOutlined/>}
+              loading={saving}
+              disabled={conflictVersion !== undefined}
+              onClick={() => void apply()}
+            >
+              Publish subgraph
+            </Button>
           )}
         </Space>
       </Flex>
 
-      {!liveState.readiness?.liveControlsAvailable && definition.kind === 'graph' && (
-        <Alert type="warning" showIcon message="Apply is paused; draft editing and Save remain available" description={liveReason}/>
-      )}
-      {liveState.recoveryRequired && <Alert type="info" showIcon message="Recovering missed live events from a full snapshot"/>}
-      {conflictVersion !== undefined && (
-        <Alert
-          type="error"
-          showIcon
-          message={`Draft conflict with server version ${conflictVersion}`}
-          description="Your local graph and layout are still present. Choose whether to rebase them onto the current version or load the server draft."
-          action={<Space direction="vertical"><Button onClick={() => void resolveConflict(true)}>Keep mine and review</Button><Button onClick={() => void resolveConflict(false)}>Load server draft</Button></Space>}
-        />
-      )}
-      {notice && <Alert type={applyPhase === 'failed' ? 'error' : 'info'} showIcon message={notice}/>}
+      <StableStatusRegion status={pageStatus} minHeight={88}/>
       {applyPhase !== 'idle' && (
         <Card size="small" title="Apply progress">
           <Steps
@@ -621,7 +628,6 @@ export function GraphEditorPage() {
                     .reduce((sum, count) => sum + count, 0)
                   return `${changes} interface or content item(s) differ. Review parameter and port bindings before upgrading.`
                 }}
-                onSaveDraft={saveDraft}
               />
             ),
           },
@@ -655,7 +661,11 @@ export function GraphEditorPage() {
         <Tag>Desired revision {editing?.state ?? 'new'}</Tag>
         <Tag color="green">Applied {currentPlan?.applied.status ?? 'idle'}</Tag>
         <Tag color={liveState.connection === 'online' ? 'blue' : 'orange'}>Live events {liveState.connection}</Tag>
-        {dirty && <Text type="warning">Unsaved changes</Text>}
+        <Tag color={autosave.state.status === 'saved' ? 'green' : autosave.state.status === 'conflict' ? 'red' : autosave.state.status === 'offline' ? 'orange' : 'blue'}>
+          Autosave {autosave.state.status}
+        </Tag>
+        {['offline', 'failed'].includes(autosave.state.status) && <Button size="small" onClick={autosave.retry}>Retry autosave</Button>}
+        {autosave.state.error && <Text type="danger">{autosave.state.error}</Text>}
       </Space>
     </Space>
   )

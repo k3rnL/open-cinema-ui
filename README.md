@@ -30,6 +30,38 @@ features. Desired, resolved, applied, and observed runtime representations stay
 separate. Processors such as CamillaDSP and the adaptive PCM decoder are graph
 nodes, while logical audio inputs and outputs are durable endpoint references.
 
+The management navigation has distinct operational roles:
+
+- **Dashboard** summarizes appliance/audio health, bounded live CPU and RAM
+  history, versions, master output level, and capability-advertised system
+  controls.
+- **Devices** lists durable logical inputs and outputs, including disconnected
+  preferences, binding evidence, and confirmed volume/mute capabilities.
+- **Managed resources** owns ROC/debug adapters and correlated CamillaDSP or
+  decoder instances. It exposes only actions advertised by the backend.
+- **Audio graphs** authors desired routing and processing; **CamillaDSP** owns
+  profile documents; **Speaker test** performs bounded channel checks.
+- **Plugins** separates the first-party Marketplace from Installed integrations,
+  advanced trusted Git inspection, provenance/permission diagnostics, operation
+  progress, and lifecycle controls.
+
+Enabled plugins may add navigation and pages without rebuilding this repository.
+The shared package validates their versioned declarative descriptors and the
+admin app renders only product-owned Ant Design templates and typed widgets at
+`/plugins/:pluginId/:pageId`. Contributions cannot ship browser JavaScript,
+HTML, or CSS. Invalid or failed contributions are isolated to their own page;
+core dashboard/navigation startup does not wait for plugin data endpoints.
+
+Graph changes start or reuse a draft automatically and are autosaved. The
+canvas remains compact while node configuration appears in a stable page-level
+inspector. Common fields, graph parameters, public ports, and subgraph bindings
+use structured controls. Conditions name their operation and expose live facts
+and typed values; endpoint groups, signal adapters, and per-output CamillaDSP
+profiles have dedicated editors. Hover or focus a node's information icon for
+its catalogue description. Advanced JSON is an explicit lossless fallback only
+for genuinely open-ended schemas. Apply drains pending saves before validation,
+publication, activation, and reconciliation.
+
 The shared package is resolved from TypeScript source by Vite during local
 development. Its compiled output is still a required release gate and is
 produced in `packages/shared/dist`.
