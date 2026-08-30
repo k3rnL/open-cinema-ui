@@ -9,7 +9,7 @@ import {ManagedResourcesPage} from './ManagedResourcesPage'
 
 const api = vi.hoisted(() => ({
   managedResources: vi.fn(),
-  restartAdapter: vi.fn(),
+  invokeManagedResourceAction: vi.fn(),
 }))
 
 vi.mock('./client', () => ({audioApi: api}))
@@ -44,6 +44,21 @@ const processor: ManagedResourceDto = {
   correlations: [],
 }
 
+const pluginSource: ManagedResourceDto = {
+  schemaVersion: 1,
+  id: 'plugin:open-cinema.librespot:source-a',
+  resourceType: 'plugin-managed-source',
+  name: 'Open Cinema A',
+  kind: 'open-cinema.librespot',
+  version: '0.8.0',
+  versionStatus: 'known',
+  desired: {lifecycle: 'running', enabled: true, updateVersion: 7},
+  observed: {lifecycle: 'running', health: 'healthy', mode: 'idle', profile: 'discovery', lastError: {}, observedAt: '2026-08-30T10:00:00Z'},
+  freshness: {observedAt: '2026-08-30T10:00:00Z', runtimeGeneration: 14, stale: false},
+  actions: [{id: 'restart', label: 'Restart', available: true, reason: null, method: 'POST', href: '/api/plugins/open-cinema.librespot/instances/source-a/actions/restart', updateVersion: 7}],
+  correlations: [],
+}
+
 beforeAll(() => {
   const getComputedStyle = window.getComputedStyle
   Object.defineProperty(window, 'getComputedStyle', {writable: true, value: (element: Element) => getComputedStyle(element)})
@@ -67,8 +82,8 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  api.managedResources.mockResolvedValue({schemaVersion: 1, items: [adapter, processor]})
-  api.restartAdapter.mockResolvedValue({})
+  api.managedResources.mockResolvedValue({schemaVersion: 1, items: [adapter, pluginSource, processor]})
+  api.invokeManagedResourceAction.mockResolvedValue({})
 })
 
 afterEach(cleanup)
@@ -78,6 +93,7 @@ describe('ManagedResourcesPage', () => {
     const {container} = render(<MemoryRouter><ManagedResourcesPage/></MemoryRouter>)
 
     expect(await screen.findByText('Television ROC input')).toBeTruthy()
+    expect(screen.getByText('Open Cinema A')).toBeTruthy()
     expect(screen.getByText('CamillaDSP · main')).toBeTruthy()
     expect(screen.getByRole('link', {name: /Configure adapters/}).getAttribute('href')).toBe('/managed-resources/adapters')
 
@@ -90,11 +106,11 @@ describe('ManagedResourcesPage', () => {
     expect(results.violations).toEqual([])
   })
 
-  it('restarts an adapter using its advertised version', async () => {
+  it('invokes a resource action using its advertised capability', async () => {
     render(<MemoryRouter><ManagedResourcesPage/></MemoryRouter>)
-    const adapterRow = (await screen.findByText('Television ROC input')).closest('tr')!
-    fireEvent.click(within(adapterRow).getByRole('button', {name: /Restart/}))
+    const sourceRow = (await screen.findByText('Open Cinema A')).closest('tr')!
+    fireEvent.click(within(sourceRow).getByRole('button', {name: /Restart/}))
     fireEvent.click(await screen.findByRole('button', {name: 'Restart'}))
-    await waitFor(() => expect(api.restartAdapter).toHaveBeenCalledWith('roc-input', 4))
+    await waitFor(() => expect(api.invokeManagedResourceAction).toHaveBeenCalledWith(pluginSource.actions[0]))
   })
 })

@@ -98,15 +98,15 @@ export function ManagedResourcesPage() {
 
   const invoke = useCallback(async (resource: ManagedResourceDto, action: ManagedResourceActionDto) => {
     if (
-      resource.resourceType !== 'adapter'
-      || action.id !== 'restart'
+      !action.available
+      || action.method !== 'POST'
       || action.updateVersion === null
       || !action.href
     ) return
     setActionInFlight(resource.id)
     try {
-      await audioApi.restartAdapter(resource.id.replace(/^adapter:/, ''), action.updateVersion)
-      message.success(`${resource.name} restart requested.`)
+      await audioApi.invokeManagedResourceAction(action)
+      message.success(`${resource.name}: ${action.label.toLowerCase()} requested.`)
       await load()
     } catch (caught) {
       message.error(caught instanceof Error ? caught.message : String(caught))
@@ -182,6 +182,7 @@ export function ManagedResourcesPage() {
   ], [actionInFlight, invoke])
 
   const adapters = resources.filter((resource) => resource.resourceType === 'adapter')
+  const pluginSources = resources.filter((resource) => resource.resourceType === 'plugin-managed-source')
   const processors = resources.filter((resource) => resource.resourceType === 'processor')
   const status = error
     ? {type: 'error' as const, message: 'Managed resources could not be loaded', description: error, action: <Button onClick={() => void load()}>Retry</Button>}
@@ -219,6 +220,9 @@ export function ManagedResourcesPage() {
 
       <Card title="Endpoint adapters" extra={<Tag>{adapters.length}</Tag>}>
         {resourceTable(adapters, 'No managed adapters have been configured.')}
+      </Card>
+      <Card title="Plugin audio sources" extra={<Tag>{pluginSources.length}</Tag>}>
+        {resourceTable(pluginSources, 'No plugin-managed audio sources have been configured.')}
       </Card>
       <Card title="Audio processors" extra={<Tag>{processors.length}</Tag>}>
         {resourceTable(processors, 'No managed processors have been observed.')}

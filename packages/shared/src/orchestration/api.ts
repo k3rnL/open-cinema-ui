@@ -552,6 +552,24 @@ export class AudioOrchestrationApi {
     return { schemaVersion: 1, items: result.items.map(parseManagedResource) }
   }
 
+  async invokeManagedResourceAction(action: ManagedResourceDto['actions'][number]): Promise<unknown> {
+    if (
+      !action.available
+      || action.method !== 'POST'
+      || action.updateVersion === null
+      || !action.href?.startsWith('/api/')
+    ) {
+      throw new Error('Managed resource action is not executable')
+    }
+    return (
+      await this.client.request<unknown>(
+        'POST',
+        action.href.slice('/api'.length),
+        { updateVersion: action.updateVersion },
+      )
+    ).data
+  }
+
   async processors(): Promise<{ items: RuntimeProjectionDto[] }> {
     return (
       await this.response<{ items: RuntimeProjectionDto[] }>('GET', '/runtime/processors')

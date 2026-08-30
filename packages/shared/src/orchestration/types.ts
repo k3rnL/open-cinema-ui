@@ -319,7 +319,7 @@ export interface ManagedResourceActionDto {
 export interface ManagedResourceDto {
   schemaVersion: 1
   id: string
-  resourceType: 'adapter' | 'processor'
+  resourceType: 'adapter' | 'plugin-managed-source' | 'processor'
   name: string
   kind: string
   version: string | null

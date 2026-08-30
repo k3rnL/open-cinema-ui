@@ -208,7 +208,7 @@ export function parseManagedResource(value: unknown): ManagedResourceDto {
   string(candidate.id, 'managed resource.id')
   string(candidate.name, 'managed resource.name')
   string(candidate.kind, 'managed resource.kind')
-  if (!['adapter', 'processor'].includes(String(candidate.resourceType))) {
+  if (!['adapter', 'plugin-managed-source', 'processor'].includes(String(candidate.resourceType))) {
     throw new InvalidAudioContractError('managed resource type is invalid')
   }
   object(candidate.desired, 'managed resource.desired')

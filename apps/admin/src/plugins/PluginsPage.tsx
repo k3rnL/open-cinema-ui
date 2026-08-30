@@ -82,8 +82,11 @@ function stateColor(value: string | null): string {
 }
 
 function OperationRegion({operations}: {operations: PluginOperationDto[]}) {
-  const active = operations.find((item) => !['succeeded', 'failed', 'cancelled'].includes(item.status))
-  const latestFailure = operations.find((item) => item.status === 'failed')
+  const ordered = [...operations].sort((left, right) => right.requestedAt.localeCompare(left.requestedAt))
+  const terminal = new Set(['succeeded', 'failed', 'cancelled'])
+  const active = ordered.find((item) => !terminal.has(item.status))
+  const latestTerminal = ordered.find((item) => terminal.has(item.status))
+  const latestFailure = latestTerminal?.status === 'failed' ? latestTerminal : undefined
   return (
     <div style={{minHeight: 94}} aria-live="polite">
       {active ? (

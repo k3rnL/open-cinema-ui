@@ -126,6 +126,7 @@ describe('validated admin UX contracts', () => {
     expect(parseMasterAudioLevel(master).desired.level).toBe(0.8)
     expect(parseEndpointAudioLevel(endpoint).capabilities.mute.writable).toBe(false)
     expect(parseManagedResource(resource).actions[0].available).toBe(false)
+    expect(parseManagedResource({...resource, resourceType: 'plugin-managed-source'}).resourceType).toBe('plugin-managed-source')
     expect(parseRuntimeExplanation(explanation).route[1].role).toBe('output')
   })
 
@@ -173,6 +174,45 @@ describe('system and level clients', () => {
     await expect(api.updateMasterLevel(4, { level: 0.7 })).rejects.toBeInstanceOf(ApiProblemError)
     const headers = new Headers(fetcher.mock.calls[0][1]?.headers)
     expect(headers.get('If-Match')).toBe('4')
+  })
+
+  it('invokes a same-origin managed-resource capability with its advertised version', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({data: {accepted: true}}), {
+      status: 202,
+      headers: {'Content-Type': 'application/json'},
+    }))
+    vi.stubGlobal('fetch', fetcher)
+    const api = new AudioOrchestrationApi({client: new ApiClient('http://open-cinema.test/api')})
+    const action = {
+      id: 'restart',
+      label: 'Restart',
+      available: true,
+      reason: null,
+      method: 'POST' as const,
+      href: '/api/plugins/open-cinema.librespot/instances/source-a/actions/restart',
+      updateVersion: 7,
+    }
+
+    await api.invokeManagedResourceAction(action)
+
+    expect(fetcher).toHaveBeenCalledWith(
+      'http://open-cinema.test/api/plugins/open-cinema.librespot/instances/source-a/actions/restart',
+      expect.objectContaining({method: 'POST', body: JSON.stringify({updateVersion: 7})}),
+    )
+  })
+
+  it('rejects a managed-resource action outside the Open Cinema API', async () => {
+    const api = new AudioOrchestrationApi({client: new ApiClient('http://open-cinema.test/api')})
+
+    await expect(api.invokeManagedResourceAction({
+      id: 'restart',
+      label: 'Restart',
+      available: true,
+      reason: null,
+      method: 'POST',
+      href: 'https://example.test/restart',
+      updateVersion: 7,
+    })).rejects.toThrow('not executable')
   })
 })
 
