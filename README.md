@@ -174,7 +174,7 @@ All four manifests and their lockfile entries use one explicit version. Set it
 without creating a commit, tag, push, or publication:
 
 ```bash
-npm run version:set -- 2.0.0
+npm run version:set -- 2.1.0
 npm run version:check
 ```
 
@@ -186,7 +186,7 @@ complete validation gate before committing it.
 For a tag candidate, verify identity explicitly:
 
 ```bash
-npm run version:check -- --tag v2.0.0
+npm run version:check -- --tag v2.1.0
 ```
 
 ## Release flow
@@ -211,9 +211,9 @@ npm run version:check -- --tag v2.0.0
 For local packaging/verification of an already validated build:
 
 ```bash
-npm run release:package -- --tag v2.0.0
-npm run version:check -- --tag v2.0.0 --dist --artifacts release-dist
-npm run release:verify -- --input release-dist --tag v2.0.0 --smoke
+npm run release:package -- --tag v2.1.0
+npm run version:check -- --tag v2.1.0 --dist --artifacts release-dist
+npm run release:verify -- --input release-dist --tag v2.1.0 --smoke
 ```
 
 Verification checks archive paths, SHA-256 values, provenance, application
