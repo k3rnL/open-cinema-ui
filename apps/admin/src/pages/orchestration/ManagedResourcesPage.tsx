@@ -106,7 +106,7 @@ export function ManagedResourcesPage() {
     setActionInFlight(resource.id)
     try {
       await audioApi.invokeManagedResourceAction(action)
-      message.success(`${resource.name}: ${action.label.toLowerCase()} requested.`)
+      message.success(`${resource.name} ${action.label.toLowerCase()} requested.`)
       await load()
     } catch (caught) {
       message.error(caught instanceof Error ? caught.message : String(caught))
