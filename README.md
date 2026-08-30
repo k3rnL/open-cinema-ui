@@ -174,7 +174,7 @@ All four manifests and their lockfile entries use one explicit version. Set it
 without creating a commit, tag, push, or publication:
 
 ```bash
-npm run version:set -- 2.1.0
+npm run version:set -- 2.1.1
 npm run version:check
 ```
 
@@ -186,7 +186,7 @@ complete validation gate before committing it.
 For a tag candidate, verify identity explicitly:
 
 ```bash
-npm run version:check -- --tag v2.1.0
+npm run version:check -- --tag v2.1.1
 ```
 
 ## Release flow
@@ -199,21 +199,22 @@ npm run version:check -- --tag v2.1.0
    gates to pass.
 4. Create and push one matching `v<version>` tag. The tag workflow repeats the
    same gates and rejects a tag/version mismatch.
-5. The workflow builds separate admin/on-box archives, checksums, and portable
-   provenance, uploads them to an isolated job, downloads them again, and
-   verifies contents and served builds. It then requires the repository
-   immutable-release policy, creates a draft, attaches every verified asset,
-   and publishes only after the complete set is present. Publication makes the
-   release tag and assets immutable.
+5. Before tagging, a maintainer enables repository release immutability and sets
+   the `IMMUTABLE_RELEASES_ENABLED=true` repository variable. The workflow builds
+   separate admin/on-box archives, checksums, and portable provenance, uploads
+   them to an isolated job, downloads them again, and verifies contents and
+   served builds. It then creates a draft, attaches every verified asset,
+   publishes only after the complete set is present, and verifies the published
+   release reports itself immutable.
 6. Download published assets into a new directory and rerun verification before
    adding their URLs and digests to a deployment manifest.
 
 For local packaging/verification of an already validated build:
 
 ```bash
-npm run release:package -- --tag v2.1.0
-npm run version:check -- --tag v2.1.0 --dist --artifacts release-dist
-npm run release:verify -- --input release-dist --tag v2.1.0 --smoke
+npm run release:package -- --tag v2.1.1
+npm run version:check -- --tag v2.1.1 --dist --artifacts release-dist
+npm run release:verify -- --input release-dist --tag v2.1.1 --smoke
 ```
 
 Verification checks archive paths, SHA-256 values, provenance, application

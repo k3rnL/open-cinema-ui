@@ -123,14 +123,10 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Require repository release immutability before publication
+      - name: Require maintainer-confirmed release immutability
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          test "$(gh api \
-            -H 'X-GitHub-Api-Version: 2026-03-10' \
-            "repos/$GITHUB_REPOSITORY/immutable-releases" \
-            --jq .enabled)" = true
+          IMMUTABLE_RELEASES_ENABLED: ${{ vars.IMMUTABLE_RELEASES_ENABLED }}
+        run: test "$IMMUTABLE_RELEASES_ENABLED" = true
 
       - name: Create draft GitHub release and upload verified assets
         uses: softprops/action-gh-release@v2
@@ -144,3 +140,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release edit "$GITHUB_REF_NAME" --draft=false
+
+      - name: Verify the published release is immutable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh api \
+            "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
+            --jq .immutable)" = true
