@@ -59,6 +59,7 @@ export interface GraphNodeData extends Record<string, unknown> {
   runtime?: RuntimeProjectionDto
   dirty: boolean
   editable: boolean
+  onSelect?: (nodeId: string) => void
 }
 
 export function GraphNodeCard({data, selected}: NodeProps<GraphNodeData>) {
@@ -90,6 +91,7 @@ export function GraphNodeCard({data, selected}: NodeProps<GraphNodeData>) {
               size="small"
               aria-label={`About ${definition?.displayName ?? node.type}`}
               icon={<InfoCircleOutlined/>}
+              onFocus={() => data.onSelect?.(node.id)}
               onMouseDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}
             />

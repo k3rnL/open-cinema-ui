@@ -33,6 +33,7 @@ beforeAll(() => {
 
 describe('GraphNodeCard', () => {
   it('shows concise node help from an accessible information control', async () => {
+    const onSelect = vi.fn()
     const data: GraphNodeData = {
       graphNode: {id: 'mixer', type: definition.id, version: 1, configuration: {}, layout: {x: 0, y: 0}},
       definition,
@@ -41,11 +42,14 @@ describe('GraphNodeCard', () => {
       observed: false,
       dirty: false,
       editable: true,
+      onSelect,
     }
     const props = {data, selected: false} as unknown as NodeProps<GraphNodeData>
     render(<ReactFlowProvider><GraphNodeCard {...props}/></ReactFlowProvider>)
 
     const information = screen.getByRole('button', {name: 'About Mixer intent'})
+    fireEvent.focus(information)
+    expect(onSelect).toHaveBeenCalledWith('mixer')
     fireEvent.mouseEnter(information)
     expect(await screen.findByText(definition.description)).toBeTruthy()
   })

@@ -230,6 +230,7 @@ export function AdvancedGraphEditor({
     return {
       id: node.id,
       type: 'orchestration',
+      focusable: false,
       selected: selectedNodeId === node.id,
       position: {x: node.layout?.x ?? index * 300, y: node.layout?.y ?? 120},
       data: {
@@ -241,6 +242,7 @@ export function AdvancedGraphEditor({
         runtime: runtimeForNode(node, runtime),
         dirty: JSON.stringify(savedNodes.get(node.id)) !== JSON.stringify(node),
         editable,
+        onSelect: setSelectedNodeId,
       },
     }
   })
